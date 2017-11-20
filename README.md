@@ -1,9 +1,10 @@
 # Filewatch
-**Master**  
-[![Master](https://travis-ci.org/ThomasMonkman/filewatch.svg?branch=master)](https://travis-ci.org/ThomasMonkman/filewatch)
 
-**Develop**  
-[![Develop](https://travis-ci.org/ThomasMonkman/filewatch.svg?branch=develop)](https://travis-ci.org/ThomasMonkman/filewatch)
+| Branch        | Status        |
+| ------------- |:-------------:|
+| **Master**    | [![Master](https://travis-ci.org/ThomasMonkman/filewatch.svg?branch=master)](https://travis-ci.org/ThomasMonkman/filewatch) |
+| **Develop**   | [![Develop](https://travis-ci.org/ThomasMonkman/filewatch.svg?branch=develop)](https://travis-ci.org/ThomasMonkman/filewatch) |
+
 Single header only file watcher in c++
 
 #### Example:
