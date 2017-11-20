@@ -8,6 +8,8 @@ add_executable(${FILEWATCH_UNIT_TEST_TARGET_NAME}
 	${PROJECT_SOURCE_DIR}/tests/CatchMain.cpp
 	${PROJECT_SOURCE_DIR}/tests/Test.cpp)
 
+#target_compile_features(${FILEWATCH_UNIT_TEST_TARGET_NAME} PRIVATE cxx_std_14)
+
 #enable pthreads for linux
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
