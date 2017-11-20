@@ -48,7 +48,7 @@ namespace filewatch {
 			_callback(callback),
 			_directory(get_directory())
 #ifdef _WIN32
-			,_close_event(CreateEvent(NULL, TRUE, FALSE, NULL))
+			, _close_event(CreateEvent(NULL, TRUE, FALSE, NULL))
 #endif // WIN32
 		{
 #ifdef _WIN32
@@ -102,7 +102,7 @@ namespace filewatch {
 			FILE_NOTIFY_CHANGE_ATTRIBUTES |
 			FILE_NOTIFY_CHANGE_DIR_NAME |
 			FILE_NOTIFY_CHANGE_FILE_NAME;
-		
+
 		const std::map<DWORD, ChangeType> _change_type_mapping = {
 			{ FILE_ACTION_ADDED, ChangeType::added },
 			{ FILE_ACTION_REMOVED, ChangeType::removed },
@@ -120,10 +120,9 @@ namespace filewatch {
 
 		FolderInfo  _directory;
 
-		const std::uint32_t _listen_filters =
-			IN_MODIFY | IN_CREATE | IN_DELETE;
+		const std::uint32_t _listen_filters = IN_MODIFY | IN_CREATE | IN_DELETE;
 
-		const static std::size_t event_size = ( sizeof (struct inotify_event) );
+		const static std::size_t event_size = (sizeof(struct inotify_event));
 #endif // __unix__
 
 #ifdef _WIN32
@@ -223,7 +222,8 @@ namespace filewatch {
 			if (folder < 0) {
 				throw std::system_error(errno, std::system_category());
 			}
-			const auto watch = inotify_add_watch(folder, _path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
+			const auto listen_filters = _listen_filters;
+			const auto watch = inotify_add_watch(folder, _path.c_str(), listen_filters);
 			if (watch < 0) {
 				throw std::system_error(errno, std::system_category());
 			}
@@ -232,37 +232,35 @@ namespace filewatch {
 
 		void monitor_directory() {
 			std::vector<char> buffer(1024 * 256);
-			
+
 			while (_destory == false) {
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
-
-				if (length < 0) {
-					//throw std::system_error(errno, std::system_category());
-				}
-				std::size_t i = 0;
-				std::vector<std::pair<T, ChangeType>> parsed_information;
-				while (i < length) {
-					struct inotify_event *event = (struct inotify_event *) &buffer[i];
-					if (event->len) {
-						const std::basic_string<typename T::value_type> filename{ event->name };
-						if (event->mask & IN_CREATE) {
-							parsed_information.emplace_back(T{ filename }, ChangeType::added);
+				if (length > 0) {
+					std::size_t i = 0;
+					std::vector<std::pair<T, ChangeType>> parsed_information;
+					while (i < length) {
+						struct inotify_event *event = (struct inotify_event *) &buffer[i];
+						if (event->len) {
+							const std::basic_string<typename T::value_type> filename{ event->name };
+							if (event->mask & IN_CREATE) {
+								parsed_information.emplace_back(T{ filename }, ChangeType::added);
+							}
+							else if (event->mask & IN_DELETE) {
+								parsed_information.emplace_back(T{ filename }, ChangeType::removed);
+							}
+							else if (event->mask & IN_MODIFY) {
+								parsed_information.emplace_back(T{ filename }, ChangeType::modified);
+							}
 						}
-						else if (event->mask & IN_DELETE) {
-							parsed_information.emplace_back(T{ filename }, ChangeType::removed);
-						}
-						else if (event->mask & IN_MODIFY) {
-							parsed_information.emplace_back(T{ filename }, ChangeType::modified);
-						}
+						i += event_size + event->len;
 					}
-					i += event_size + event->len;
+					//dispatch callbacks
+					{
+						std::lock_guard<std::mutex> lock(_callback_mutex);
+						_callback_information.insert(_callback_information.end(), parsed_information.begin(), parsed_information.end());
+					}
+					cv.notify_all();
 				}
-				//dispatch callbacks
-				{
-					std::lock_guard<std::mutex> lock(_callback_mutex);
-					_callback_information.insert(_callback_information.end(), parsed_information.begin(), parsed_information.end());
-				}
-				cv.notify_all();
 			}
 		}
 #endif // __unix__
