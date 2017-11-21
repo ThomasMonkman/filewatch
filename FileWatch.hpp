@@ -223,7 +223,7 @@ namespace filewatch {
 				throw std::system_error(errno, std::system_category());
 			}
 			const auto listen_filters = _listen_filters;
-			const auto watch = inotify_add_watch(folder, _path.c_str(), listen_filters);
+			const auto watch = inotify_add_watch(folder, _path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
 			if (watch < 0) {
 				throw std::system_error(errno, std::system_category());
 			}
