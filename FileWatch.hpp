@@ -65,7 +65,7 @@ namespace filewatch {
 			SetEvent(_close_event);
 #endif // WIN32
 #if __unix__
-			close(_directory.folder);
+			inotify_rm_watch(_directory.folder, _directory.watch);
 #endif // __unix__
 			cv.notify_all();
 			_watch_thread.join();
@@ -74,7 +74,7 @@ namespace filewatch {
 			CloseHandle(_directory);
 #endif // WIN32
 #if __unix__
-			inotify_rm_watch(_directory.folder, _directory.watch);
+			close(_directory.folder);
 #endif // __unix__
 		}
 
