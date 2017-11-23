@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <tchar.h>
+#include <Pathcch.h>
 #endif // WIN32
 
 #if __unix__
@@ -31,7 +32,7 @@
 #include <system_error>
 #include <string>
 namespace filewatch {
-	enum class ChangeType {
+	enum class Event {
 		added,
 		removed,
 		modified,
@@ -43,7 +44,7 @@ namespace filewatch {
 	class FileWatch
 	{
 	public:
-		FileWatch(T path, std::function<void(const T& file, const ChangeType change_type)> callback) :
+		FileWatch(T path, std::function<void(const T& file, const Event change_type)> callback) :
 			_path(path),
 			_callback(callback),
 			_directory(get_directory())
@@ -80,14 +81,15 @@ namespace filewatch {
 
 	private:
 		T _path;
+		bool _watching_single_file = { false };
 		std::atomic<bool> _destory = { false };
-		std::function<void(const T& file, const ChangeType change_type)> _callback;
+		std::function<void(const T& file, const Event change_type)> _callback;
 
 		std::thread _watch_thread;
 
 		std::condition_variable cv;
 		std::mutex _callback_mutex;
-		std::vector<std::pair<T, ChangeType>> _callback_information;
+		std::vector<std::pair<T, Event>> _callback_information;
 		std::thread _callback_thread;
 #ifdef _WIN32
 		HANDLE _directory = { nullptr };
@@ -103,12 +105,12 @@ namespace filewatch {
 			FILE_NOTIFY_CHANGE_DIR_NAME |
 			FILE_NOTIFY_CHANGE_FILE_NAME;
 
-		const std::map<DWORD, ChangeType> _change_type_mapping = {
-			{ FILE_ACTION_ADDED, ChangeType::added },
-			{ FILE_ACTION_REMOVED, ChangeType::removed },
-			{ FILE_ACTION_MODIFIED, ChangeType::modified },
-			{ FILE_ACTION_RENAMED_OLD_NAME, ChangeType::renamed_old },
-			{ FILE_ACTION_RENAMED_NEW_NAME, ChangeType::renamed_new }
+		const std::map<DWORD, Event> _change_type_mapping = {
+			{ FILE_ACTION_ADDED, Event::added },
+			{ FILE_ACTION_REMOVED, Event::removed },
+			{ FILE_ACTION_MODIFIED, Event::modified },
+			{ FILE_ACTION_RENAMED_OLD_NAME, Event::renamed_old },
+			{ FILE_ACTION_RENAMED_NEW_NAME, Event::renamed_new }
 		};
 #endif // WIN32
 
@@ -127,8 +129,18 @@ namespace filewatch {
 
 #ifdef _WIN32
 		HANDLE get_directory() {
+			auto file_info = GetFileAttributes(_path.c_str());
+
+			if (file_info == INVALID_FILE_ATTRIBUTES)
+			{
+				throw std::system_error(GetLastError(), std::system_category());
+			}
+			_watching_single_file = (file_info & FILE_ATTRIBUTE_DIRECTORY) == false;
+
+			auto watch_path = _watching_single_file ? _path.substr(0, _path.find_last_of(L"\\/")) : _path;
+
 			HANDLE directory = ::CreateFile(
-				_path.c_str(),           // pointer to the file name
+				watch_path.c_str(),           // pointer to the file name
 				FILE_LIST_DIRECTORY,    // access (read/write) mode
 				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, // share mode
 				NULL, // security descriptor
@@ -156,7 +168,7 @@ namespace filewatch {
 
 			auto async_pending = false;
 			do {
-				std::vector<std::pair<T, ChangeType>> parsed_information;
+				std::vector<std::pair<T, Event>> parsed_information;
 				ReadDirectoryChangesW(
 					_directory,
 					buffer.data(), buffer.size(),
@@ -182,7 +194,15 @@ namespace filewatch {
 					do
 					{
 						std::basic_string<typename T::value_type> filename{ file_information->FileName, file_information->FileNameLength / 2 };
-						parsed_information.emplace_back(T{ filename }, _change_type_mapping.at(file_information->Action));
+						if (_watching_single_file) {
+							const auto filename_from_path = _path.substr(_path.find_last_of(L"\\/") + 1, _path.size());
+							if (filename == filename_from_path) { //if we are watching a single file, only that file should trigger action
+								parsed_information.emplace_back(T{ filename }, _change_type_mapping.at(file_information->Action));								
+							}
+						}
+						else {
+							parsed_information.emplace_back(T{ filename }, _change_type_mapping.at(file_information->Action));
+						}
 
 						if (file_information->NextEntryOffset == 0) {
 							break;
@@ -237,19 +257,19 @@ namespace filewatch {
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
 				if (length > 0) {
 					std::size_t i = 0;
-					std::vector<std::pair<T, ChangeType>> parsed_information;
+					std::vector<std::pair<T, Event>> parsed_information;
 					while (i < length) {
 						struct inotify_event *event = (struct inotify_event *) &buffer[i];
 						if (event->len) {
 							const std::basic_string<typename T::value_type> filename{ event->name };
 							if (event->mask & IN_CREATE) {
-								parsed_information.emplace_back(T{ filename }, ChangeType::added);
+								parsed_information.emplace_back(T{ filename }, Event::added);
 							}
 							else if (event->mask & IN_DELETE) {
-								parsed_information.emplace_back(T{ filename }, ChangeType::removed);
+								parsed_information.emplace_back(T{ filename }, Event::removed);
 							}
 							else if (event->mask & IN_MODIFY) {
-								parsed_information.emplace_back(T{ filename }, ChangeType::modified);
+								parsed_information.emplace_back(T{ filename }, Event::modified);
 							}
 						}
 						i += event_size + event->len;
