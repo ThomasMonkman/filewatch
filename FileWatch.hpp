@@ -31,6 +31,7 @@
 #include <map>
 #include <system_error>
 #include <string>
+
 namespace filewatch {
 	enum class Event {
 		added,
@@ -47,12 +48,10 @@ namespace filewatch {
 		FileWatch(T path, std::function<void(const T& file, const Event change_type)> callback) :
 			_path(path),
 			_callback(callback),
-			_directory(get_directory())
-#ifdef _WIN32
-			, _close_event(CreateEvent(NULL, TRUE, FALSE, NULL))
-#endif // WIN32
+			_directory(get_directory(path))
 		{
 #ifdef _WIN32
+			_close_event = CreateEvent(NULL, TRUE, FALSE, NULL);
 			if (!_close_event) {
 				throw std::system_error(GetLastError(), std::system_category());
 			}
@@ -128,8 +127,8 @@ namespace filewatch {
 #endif // __unix__
 
 #ifdef _WIN32
-		HANDLE get_directory() {
-			auto file_info = GetFileAttributes(_path.c_str());
+		HANDLE get_directory(const T& path) {
+			auto file_info = GetFileAttributes(path.c_str());
 
 			if (file_info == INVALID_FILE_ATTRIBUTES)
 			{
@@ -137,7 +136,7 @@ namespace filewatch {
 			}
 			_watching_single_file = (file_info & FILE_ATTRIBUTE_DIRECTORY) == false;
 
-			auto watch_path = _watching_single_file ? _path.substr(0, _path.find_last_of(L"\\/")) : _path;
+			auto watch_path = _watching_single_file ? path.substr(0, path.find_last_of(L"\\/")) : path;
 
 			HANDLE directory = ::CreateFile(
 				watch_path.c_str(),           // pointer to the file name
@@ -195,6 +194,8 @@ namespace filewatch {
 					{
 						std::basic_string<typename T::value_type> filename{ file_information->FileName, file_information->FileNameLength / 2 };
 						if (_watching_single_file) {
+							auto const pos = path.find_last_of('/');
+							const auto leaf = path.substr(pos + 1);
 							const auto filename_from_path = _path.substr(_path.find_last_of(L"\\/") + 1, _path.size());
 							if (filename == filename_from_path) { //if we are watching a single file, only that file should trigger action
 								parsed_information.emplace_back(T{ filename }, _change_type_mapping.at(file_information->Action));								
@@ -237,13 +238,13 @@ namespace filewatch {
 #endif // WIN32
 
 #if __unix__
-		FolderInfo get_directory() {
+		FolderInfo get_directory(const T& path) {
 			const auto folder = inotify_init();
 			if (folder < 0) {
 				throw std::system_error(errno, std::system_category());
 			}
 			const auto listen_filters = _listen_filters;
-			const auto watch = inotify_add_watch(folder, _path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
+			const auto watch = inotify_add_watch(folder, path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
 			if (watch < 0) {
 				throw std::system_error(errno, std::system_category());
 			}
