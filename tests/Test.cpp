@@ -38,23 +38,23 @@ TEST_CASE("watch for file add", "[added]") {
 }
 
 TEST_CASE("single file", "[single-file]") {
-	//const auto test_folder_path = testhelper::cross_platform_string("./test.txt");
-	//const auto test_ignore_path = testhelper::cross_platform_string("./ignore.txt");
-	//const auto test_file_name = testhelper::cross_platform_string("test.txt");
-	//// create the file otherwise the Filewatch will throw
-	//testhelper::create_and_modify_file(test_file_name);
+	const auto test_folder_path = testhelper::cross_platform_string("./test.txt");
+	const auto test_ignore_path = testhelper::cross_platform_string("./ignore.txt");
+	const auto test_file_name = testhelper::cross_platform_string("test.txt");
+	// create the file otherwise the Filewatch will throw
+	testhelper::create_and_modify_file(test_file_name);
 
-	//std::promise<test_string> promise;
-	//std::future<test_string> future = promise.get_future();
+	std::promise<test_string> promise;
+	std::future<test_string> future = promise.get_future();
 
-	//filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &test_file_name](const test_string& path, const filewatch::Event change_type) {
-	//	REQUIRE(path == test_file_name);
-	//	promise.set_value(path);
-	//});
+	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &test_file_name](const test_string& path, const filewatch::Event change_type) {
+		REQUIRE(path == test_file_name);
+		promise.set_value(path);
+	});
 
-	//testhelper::create_and_modify_file(test_ignore_path);
-	//testhelper::create_and_modify_file(test_file_name);
+	testhelper::create_and_modify_file(test_ignore_path);
+	testhelper::create_and_modify_file(test_file_name);
 
-	//auto path = testhelper::get_with_timeout(future);
-	//REQUIRE(path == test_file_name);
+	auto path = testhelper::get_with_timeout(future);
+	REQUIRE(path == test_file_name);
 }

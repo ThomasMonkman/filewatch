@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <tchar.h>
 #include <Pathcch.h>
+#include <shlwapi.h>
 #endif // WIN32
 
 #if __unix__
@@ -45,7 +46,7 @@ namespace filewatch {
 	class FileWatch
 	{
 	public:
-		FileWatch(T path, std::function<void(const T& file, const Event change_type)> callback) :
+		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
 			_path(path),
 			_callback(callback),
 			_directory(get_directory(path))
@@ -79,10 +80,20 @@ namespace filewatch {
 		}
 
 	private:
+		struct PathParts 
+		{
+			PathParts(T directory, T filename) : directory(directory), filename(filename) {}
+			T directory;
+			T filename;
+		};
 		T _path;
+
+		// only used if watch a single file
 		bool _watching_single_file = { false };
+		std::basic_string<typename T::value_type> _filename;
+
 		std::atomic<bool> _destory = { false };
-		std::function<void(const T& file, const Event change_type)> _callback;
+		std::function<void(const T& file, const Event event_type)> _callback;
 
 		std::thread _watch_thread;
 
@@ -104,7 +115,7 @@ namespace filewatch {
 			FILE_NOTIFY_CHANGE_DIR_NAME |
 			FILE_NOTIFY_CHANGE_FILE_NAME;
 
-		const std::map<DWORD, Event> _change_type_mapping = {
+		const std::map<DWORD, Event> _event_type_mapping = {
 			{ FILE_ACTION_ADDED, Event::added },
 			{ FILE_ACTION_REMOVED, Event::removed },
 			{ FILE_ACTION_MODIFIED, Event::modified },
@@ -126,6 +137,22 @@ namespace filewatch {
 		const static std::size_t event_size = (sizeof(struct inotify_event));
 #endif // __unix__
 
+		const PathParts split_directory_and_file(const T& path) const {
+			const auto predict = [](auto character) {
+#ifdef _WIN32
+				return character == _T('\\') || character == _T('/');
+#endif // WIN32
+#if __unix__
+				return character == '/';
+#endif // __unix__
+			};
+			const auto pivot = std::find_if(path.rbegin(), path.rend(), predict).base();
+			const T directory = std::basic_string<typename T::value_type>(path.begin(), pivot);
+			const T filename = std::basic_string<typename T::value_type>(pivot, path.end());
+			return PathParts(directory, filename);
+		}
+
+
 #ifdef _WIN32
 		HANDLE get_directory(const T& path) {
 			auto file_info = GetFileAttributes(path.c_str());
@@ -136,7 +163,27 @@ namespace filewatch {
 			}
 			_watching_single_file = (file_info & FILE_ATTRIBUTE_DIRECTORY) == false;
 
-			auto watch_path = _watching_single_file ? path.substr(0, path.find_last_of(L"\\/")) : path;
+			const auto watch_path = [this, &path]() {
+				if (_watching_single_file)
+				{
+					const auto parsed_path = split_directory_and_file(path);
+					_filename = parsed_path.filename;
+					return parsed_path.directory;
+				}
+			}();
+
+			/*if (_watching_single_file)
+			{
+				_filename = PathFindFileName(path.c_str());
+				T::value_type* win_path = new T::value_type [path.size() + 1];
+				PathRemoveFileSpec(win_path);
+				return T{ win_path };
+			}
+			else {
+				return path;
+			}*/
+
+			//const auto watch_path = _watching_single_file ? T{ PathRemoveFileSpec(const_cast<wchar_t*>(path.c_str())) } : path;
 
 			HANDLE directory = ::CreateFile(
 				watch_path.c_str(),           // pointer to the file name
@@ -192,17 +239,15 @@ namespace filewatch {
 					FILE_NOTIFY_INFORMATION *file_information = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(&buffer[0]);
 					do
 					{
-						std::basic_string<typename T::value_type> filename{ file_information->FileName, file_information->FileNameLength / 2 };
+						std::basic_string<typename T::value_type> changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
 						if (_watching_single_file) {
-							auto const pos = path.find_last_of('/');
-							const auto leaf = path.substr(pos + 1);
-							const auto filename_from_path = _path.substr(_path.find_last_of(L"\\/") + 1, _path.size());
-							if (filename == filename_from_path) { //if we are watching a single file, only that file should trigger action
-								parsed_information.emplace_back(T{ filename }, _change_type_mapping.at(file_information->Action));								
+							const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(changed_file).filename };
+							if (extracted_filename == _filename) { //if we are watching a single file, only that file should trigger action
+								parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
 							}
 						}
 						else {
-							parsed_information.emplace_back(T{ filename }, _change_type_mapping.at(file_information->Action));
+							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
 						}
 
 						if (file_information->NextEntryOffset == 0) {
@@ -257,7 +302,7 @@ namespace filewatch {
 			while (_destory == false) {
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
 				if (length > 0) {
-					std::size_t i = 0;
+					decltype(length) = 0;
 					std::vector<std::pair<T, Event>> parsed_information;
 					while (i < length) {
 						struct inotify_event *event = (struct inotify_event *) &buffer[i];
@@ -282,8 +327,8 @@ namespace filewatch {
 					}
 					cv.notify_all();
 				}
-			}
-		}
+	}32
+}
 #endif // __unix__
 
 		void callback_thread()
@@ -309,6 +354,6 @@ namespace filewatch {
 				}
 			}
 		}
-	};
+};
 }
 #endif
