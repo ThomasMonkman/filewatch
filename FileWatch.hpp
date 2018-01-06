@@ -32,6 +32,7 @@
 #include <map>
 #include <system_error>
 #include <string>
+#include <algorithm>
 
 namespace filewatch {
 	enum class Event {
@@ -80,13 +81,15 @@ namespace filewatch {
 		}
 
 	private:
-		struct PathParts 
+		struct PathParts
 		{
 			PathParts(T directory, T filename) : directory(directory), filename(filename) {}
 			T directory;
 			T filename;
 		};
 		T _path;
+
+		constexpr std::size_t _buffer_size = { 1024 * 256 };
 
 		// only used if watch a single file
 		bool _watching_single_file = { false };
@@ -152,6 +155,15 @@ namespace filewatch {
 			return PathParts(directory, filename);
 		}
 
+		bool pass_filter(const std::basic_string<typename T::value_type> file)
+		{
+			if (_watching_single_file) {
+				const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(changed_file).filename };
+				//if we are watching a single file, only that file should trigger action
+				return extracted_filename == _filename);
+			}
+			return true;
+		}
 
 #ifdef _WIN32
 		HANDLE get_directory(const T& path) {
@@ -172,19 +184,6 @@ namespace filewatch {
 				}
 			}();
 
-			/*if (_watching_single_file)
-			{
-				_filename = PathFindFileName(path.c_str());
-				T::value_type* win_path = new T::value_type [path.size() + 1];
-				PathRemoveFileSpec(win_path);
-				return T{ win_path };
-			}
-			else {
-				return path;
-			}*/
-
-			//const auto watch_path = _watching_single_file ? T{ PathRemoveFileSpec(const_cast<wchar_t*>(path.c_str())) } : path;
-
 			HANDLE directory = ::CreateFile(
 				watch_path.c_str(),           // pointer to the file name
 				FILE_LIST_DIRECTORY,    // access (read/write) mode
@@ -201,7 +200,7 @@ namespace filewatch {
 			return directory;
 		}
 		void monitor_directory() {
-			std::vector<BYTE> buffer(1024 * 256);
+			std::vector<BYTE> buffer(_buffer_size);
 			DWORD bytes_returned = 0;
 			OVERLAPPED overlapped_buffer{ 0 };
 
@@ -240,13 +239,8 @@ namespace filewatch {
 					do
 					{
 						std::basic_string<typename T::value_type> changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
-						if (_watching_single_file) {
-							const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(changed_file).filename };
-							if (extracted_filename == _filename) { //if we are watching a single file, only that file should trigger action
-								parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
-							}
-						}
-						else {
+						if (pass_filter(changed_file))
+						{
 							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
 						}
 
@@ -297,7 +291,7 @@ namespace filewatch {
 		}
 
 		void monitor_directory() {
-			std::vector<char> buffer(1024 * 256);
+			std::vector<char> buffer(_buffer_size);
 
 			while (_destory == false) {
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
@@ -308,14 +302,17 @@ namespace filewatch {
 						struct inotify_event *event = (struct inotify_event *) &buffer[i];
 						if (event->len) {
 							const std::basic_string<typename T::value_type> filename{ event->name };
-							if (event->mask & IN_CREATE) {
-								parsed_information.emplace_back(T{ filename }, Event::added);
-							}
-							else if (event->mask & IN_DELETE) {
-								parsed_information.emplace_back(T{ filename }, Event::removed);
-							}
-							else if (event->mask & IN_MODIFY) {
-								parsed_information.emplace_back(T{ filename }, Event::modified);
+							if (pass_filter(changed_file))
+							{
+								if (event->mask & IN_CREATE) {
+									parsed_information.emplace_back(T{ filename }, Event::added);
+								}
+								else if (event->mask & IN_DELETE) {
+									parsed_information.emplace_back(T{ filename }, Event::removed);
+								}
+								else if (event->mask & IN_MODIFY) {
+									parsed_information.emplace_back(T{ filename }, Event::modified);
+								}
 							}
 						}
 						i += event_size + event->len;
@@ -327,8 +324,8 @@ namespace filewatch {
 					}
 					cv.notify_all();
 				}
-	}32
-}
+			}
+		}
 #endif // __unix__
 
 		void callback_thread()
@@ -354,6 +351,6 @@ namespace filewatch {
 				}
 			}
 		}
-};
+	};
 }
 #endif
