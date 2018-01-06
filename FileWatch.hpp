@@ -296,7 +296,7 @@ namespace filewatch {
 			while (_destory == false) {
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
 				if (length > 0) {
-					decltype(length) i = 0;
+					std::size_t i = 0;
 					std::vector<std::pair<T, Event>> parsed_information;
 					while (i < length) {
 						struct inotify_event *event = (struct inotify_event *) &buffer[i];
