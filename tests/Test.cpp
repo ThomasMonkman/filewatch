@@ -17,8 +17,6 @@ using test_string = std::string;
 #include "Util/TestHelper.hpp"
 
 #include <future>
-#include <iostream>
-#include <fstream>
 
 
 TEST_CASE("watch for file add", "[added]") {

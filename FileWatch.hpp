@@ -89,7 +89,7 @@ namespace filewatch {
 		};
 		T _path;
 
-		constexpr std::size_t _buffer_size = { 1024 * 256 };
+		static constexpr std::size_t _buffer_size = { 1024 * 256 };
 
 		// only used if watch a single file
 		bool _watching_single_file = { false };
@@ -155,12 +155,12 @@ namespace filewatch {
 			return PathParts(directory, filename);
 		}
 
-		bool pass_filter(const std::basic_string<typename T::value_type> file)
+		bool pass_filter(const std::basic_string<typename T::value_type> file_path)
 		{
 			if (_watching_single_file) {
-				const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(changed_file).filename };
+				const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(file_path).filename };
 				//if we are watching a single file, only that file should trigger action
-				return extracted_filename == _filename);
+				return extracted_filename == _filename;
 			}
 			return true;
 		}
@@ -296,22 +296,22 @@ namespace filewatch {
 			while (_destory == false) {
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
 				if (length > 0) {
-					decltype(length) = 0;
+					decltype(length) i = 0;
 					std::vector<std::pair<T, Event>> parsed_information;
 					while (i < length) {
 						struct inotify_event *event = (struct inotify_event *) &buffer[i];
 						if (event->len) {
-							const std::basic_string<typename T::value_type> filename{ event->name };
+							const std::basic_string<typename T::value_type> changed_file{ event->name };
 							if (pass_filter(changed_file))
 							{
 								if (event->mask & IN_CREATE) {
-									parsed_information.emplace_back(T{ filename }, Event::added);
+									parsed_information.emplace_back(T{ changed_file }, Event::added);
 								}
 								else if (event->mask & IN_DELETE) {
-									parsed_information.emplace_back(T{ filename }, Event::removed);
+									parsed_information.emplace_back(T{ changed_file }, Event::removed);
 								}
 								else if (event->mask & IN_MODIFY) {
-									parsed_information.emplace_back(T{ filename }, Event::modified);
+									parsed_information.emplace_back(T{ changed_file }, Event::modified);
 								}
 							}
 						}

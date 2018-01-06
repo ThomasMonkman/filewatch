@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 #include <iostream>
+#include <fstream>
 
 namespace testhelper {
 	namespace config {
