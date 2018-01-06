@@ -175,12 +175,16 @@ namespace filewatch {
 			}
 			_watching_single_file = (file_info & FILE_ATTRIBUTE_DIRECTORY) == false;
 
-			const auto watch_path = [this, &path]() {
+			const T watch_path = [this, &path]() {
 				if (_watching_single_file)
 				{
 					const auto parsed_path = split_directory_and_file(path);
 					_filename = parsed_path.filename;
 					return parsed_path.directory;
+				}
+				else 
+				{
+					return path;
 				}
 			}();
 
@@ -277,40 +281,78 @@ namespace filewatch {
 #endif // WIN32
 
 #if __unix__
-		FolderInfo get_directory(const T& path) {
+
+		bool is_file(const T& path) const
+		{
+			struct stat statbuf;
+			if (stat(path.c_str(), &statbuf) != 0)
+			{
+				throw std::system_error(errno, std::system_category());
+			}
+			return S_ISREG(statbuf.st_mode);
+		}
+
+		FolderInfo get_directory(const T& path) 
+		{
 			const auto folder = inotify_init();
-			if (folder < 0) {
+			if (folder < 0) 
+			{
 				throw std::system_error(errno, std::system_category());
 			}
 			const auto listen_filters = _listen_filters;
+
+			_watching_single_file = is_file(path);
+
+			const T watch_path = [this, &path]() {
+				if (_watching_single_file)
+				{
+					const auto parsed_path = split_directory_and_file(path);
+					_filename = parsed_path.filename;
+					return parsed_path.directory;
+				}
+				else
+				{
+					return path;
+				}
+			}();
+
 			const auto watch = inotify_add_watch(folder, path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
-			if (watch < 0) {
+			if (watch < 0) 
+			{
 				throw std::system_error(errno, std::system_category());
 			}
 			return { folder, watch };
 		}
 
-		void monitor_directory() {
+		void monitor_directory() 
+		{
 			std::vector<char> buffer(_buffer_size);
 
-			while (_destory == false) {
+			while (_destory == false) 
+			{
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
-				if (length > 0) {
+				if (length > 0) 
+				{
 					std::size_t i = 0;
 					std::vector<std::pair<T, Event>> parsed_information;
-					while (i < length) {
+					while (i < length) 
+					{
 						struct inotify_event *event = (struct inotify_event *) &buffer[i];
-						if (event->len) {
+						if (event->len) 
+						{
 							const std::basic_string<typename T::value_type> changed_file{ event->name };
 							if (pass_filter(changed_file))
 							{
-								if (event->mask & IN_CREATE) {
+								if (event->mask & IN_CREATE) 
+								{
 									parsed_information.emplace_back(T{ changed_file }, Event::added);
 								}
-								else if (event->mask & IN_DELETE) {
+								else if (event->mask & IN_DELETE) 
+								{
 									parsed_information.emplace_back(T{ changed_file }, Event::removed);
 								}
-								else if (event->mask & IN_MODIFY) {
+								else if (event->mask & IN_MODIFY) 
+								{
 									parsed_information.emplace_back(T{ changed_file }, Event::modified);
 								}
 							}
