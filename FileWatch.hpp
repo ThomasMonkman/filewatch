@@ -35,6 +35,8 @@
 #include <string>
 #include <algorithm>
 
+#include <iostream>
+
 namespace filewatch {
 	enum class Event {
 		added,
@@ -158,8 +160,10 @@ namespace filewatch {
 
 		bool pass_filter(const std::basic_string<typename T::value_type> file_path)
 		{
+			std::cout << file_path << std::endl;
 			if (_watching_single_file) {
 				const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(file_path).filename };
+				std::cout << "Single File " << extracted_filename == _filename << std::endl;
 				//if we are watching a single file, only that file should trigger action
 				return extracted_filename == _filename;
 			}
