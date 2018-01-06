@@ -163,7 +163,7 @@ namespace filewatch {
 			std::cout << file_path << std::endl;
 			if (_watching_single_file) {
 				const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(file_path).filename };
-				std::cout << "Single File " << extracted_filename == _filename << std::endl;
+				std::cout << "Single File " << (extracted_filename == _filename) << std::endl;
 				//if we are watching a single file, only that file should trigger action
 				return extracted_filename == _filename;
 			}
@@ -338,7 +338,7 @@ namespace filewatch {
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
 				if (length > 0) 
 				{
-					std::size_t i = 0;
+					int i = 0;
 					std::vector<std::pair<T, Event>> parsed_information;
 					while (i < length) 
 					{
