@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/inotify.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif // __unix__
 
