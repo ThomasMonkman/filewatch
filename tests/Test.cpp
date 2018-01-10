@@ -1,7 +1,7 @@
 #include <string>
 using namespace std::string_literals;
-
 #ifdef _WIN32
+#define _UNICODE
 #define UNICODE
 using test_string = std::wstring;
 #endif // _WIN32
@@ -52,6 +52,7 @@ TEST_CASE("single file", "[single-file]") {
 
 	testhelper::create_and_modify_file(test_ignore_path);
 	testhelper::create_and_modify_file(test_file_name);
+
 
 	auto path = testhelper::get_with_timeout(future);
 	REQUIRE(path == test_file_name);

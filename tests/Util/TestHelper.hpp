@@ -27,9 +27,10 @@ namespace testhelper {
 			throw std::runtime_error("Timeout reached");
 		}
 	}
-#ifdef _WIN32
+
+#if defined _WIN32 && (defined UNICODE || defined _UNICODE)
 	static std::wstring cross_platform_string(std::string&& string) 
-	{
+	{ 
 		// deal with trivial case of empty string
 		if (string.empty())    return std::wstring();
 		// determine required length of new string
@@ -41,14 +42,12 @@ namespace testhelper {
 		// return new string ( compiler should optimize this away )
 		return ret;
 	}
-#endif // _WIN32
-
-#if __unix__
+#else
 	static std::string cross_platform_string(std::string&& string)
 	{
 		return std::forward<std::string>(string);
 	}
-#endif // __unix__
+#endif
 
 	template<typename T>
 	static void create_and_modify_file(T& path)

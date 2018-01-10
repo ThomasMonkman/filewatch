@@ -147,20 +147,30 @@ namespace filewatch {
 			const auto predict = [](auto character) {
 #ifdef _WIN32
 				return character == _T('\\') || character == _T('/');
-#endif // WIN32
-#if __unix__
+#elif __unix__
 				return character == '/';
 #endif // __unix__
 			};
+#ifdef _WIN32
+#define _UNICODE
+			const std::basic_string<typename T::value_type> this_directory = _T("./");
+#elif __unix__
+			const std::basic_string<typename T::value_type> this_directory = "./";
+#endif // __unix__
+			
 			const auto pivot = std::find_if(path.rbegin(), path.rend(), predict).base();
-			const T directory = std::basic_string<typename T::value_type>(path.begin(), pivot);
+			//if the path is something like "test.txt" there will be no directoy part, however we still need one, so insert './'
+			const T directory = [&]() {
+				const auto extracted_directory = std::basic_string<typename T::value_type>(path.begin(), pivot);
+				std::cout << extracted_directory << "size " << extracted_directory << "this_directory " << this_directory << std::endl;
+				return (extracted_directory.size() > 0) ? extracted_directory : this_directory;
+			}(); 
 			const T filename = std::basic_string<typename T::value_type>(pivot, path.end());
 			return PathParts(directory, filename);
 		}
 
 		bool pass_filter(const std::basic_string<typename T::value_type> file_path)
-		{
-			std::cout << file_path << std::endl;
+		{ 
 			if (_watching_single_file) {
 				const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(file_path).filename };
 				std::cout << "Single File " << (extracted_filename == _filename) << std::endl;
@@ -275,7 +285,6 @@ namespace filewatch {
 				cv.notify_all();
 			} while (_destory == false);
 
-
 			if (async_pending)
 			{
 				//clean up running async io
@@ -321,7 +330,8 @@ namespace filewatch {
 				}
 			}();
 
-			const auto watch = inotify_add_watch(folder, path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
+			std::cout << "watch path: " << watch_path << std::endl;
+			const auto watch = inotify_add_watch(folder, watch_path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
 			if (watch < 0) 
 			{
 				throw std::system_error(errno, std::system_category());
