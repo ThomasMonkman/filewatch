@@ -392,7 +392,8 @@ namespace filewatch {
 				if (_callback_information.empty() && _destory == false) {
 					cv.wait(lock, [this] { return _callback_information.size() > 0 || _destory; });
 				}
-				const auto callback_information = std::exchange(_callback_information, {});
+				decltype(_callback_information) callback_information = {};
+				std::swap(callback_information, _callback_information);
 				lock.unlock();
 
 				for (const auto& file : callback_information) {
