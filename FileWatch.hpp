@@ -144,7 +144,7 @@ namespace filewatch {
 #endif // __unix__
 
 		const PathParts split_directory_and_file(const T& path) const {
-			const auto predict = [](auto character) {
+			const auto predict = [](typename T::value_type character) {
 #ifdef _WIN32
 				return character == _T('\\') || character == _T('/');
 #elif __unix__
