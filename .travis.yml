@@ -1,4 +1,8 @@
 language: cpp
+script:
+  - cmake ./CMakeLists.txt
+  - make
+  - make CTEST_OUTPUT_ON_FAILURE=1 test
 matrix:
   include:
     # works on Precise and Trusty
