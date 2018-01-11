@@ -34,8 +34,7 @@
 #include <system_error>
 #include <string>
 #include <algorithm>
-
-#include <iostream>
+#include <type_traits>
 
 namespace filewatch {
 	enum class Event {
@@ -46,7 +45,28 @@ namespace filewatch {
 		renamed_new
 	};
 
-	template<class T>
+	template<
+		class T,
+		typename std::enable_if<std::is_integral<T>::value>::value
+	>
+	using string_type = std::basic_string<T, std::char_traits<T>>;
+
+	template<
+		class T,
+		typename std::enable_if <
+			std::is_same<
+				T, std::basic_string<char, std::char_traits<char>>
+			>::value ||
+			std::is_same<
+				T, std::basic_string<wchar_t, std::char_traits<wchar_t>>
+			>::value
+		>
+	>
+	using string_type = T;
+
+	template<
+		class T
+	>
 	class FileWatch
 	{
 	public:
@@ -96,7 +116,7 @@ namespace filewatch {
 
 		// only used if watch a single file
 		bool _watching_single_file = { false };
-		std::basic_string<typename T::value_type> _filename;
+		string_type _filename;
 
 		std::atomic<bool> _destory = { false };
 		std::function<void(const T& file, const Event event_type)> _callback;
@@ -153,27 +173,25 @@ namespace filewatch {
 			};
 #ifdef _WIN32
 #define _UNICODE
-			const std::basic_string<typename T::value_type> this_directory = _T("./");
+			const string_type this_directory = _T("./");
 #elif __unix__
-			const std::basic_string<typename T::value_type> this_directory = "./";
+			const string_type this_directory = "./";
 #endif // __unix__
 			
 			const auto pivot = std::find_if(path.rbegin(), path.rend(), predict).base();
 			//if the path is something like "test.txt" there will be no directoy part, however we still need one, so insert './'
 			const T directory = [&]() {
-				const auto extracted_directory = std::basic_string<typename T::value_type>(path.begin(), pivot);
-				std::cout << extracted_directory << "size " << extracted_directory << "this_directory " << this_directory << std::endl;
+				const auto extracted_directory = string_type(path.begin(), pivot);
 				return (extracted_directory.size() > 0) ? extracted_directory : this_directory;
 			}(); 
-			const T filename = std::basic_string<typename T::value_type>(pivot, path.end());
+			const T filename = string_type(pivot, path.end());
 			return PathParts(directory, filename);
 		}
 
-		bool pass_filter(const std::basic_string<typename T::value_type> file_path)
+		bool pass_filter(const string_type file_path)
 		{ 
 			if (_watching_single_file) {
-				const std::basic_string<typename T::value_type> extracted_filename = { split_directory_and_file(file_path).filename };
-				std::cout << "Single File " << (extracted_filename == _filename) << std::endl;
+				const string_type extracted_filename = { split_directory_and_file(file_path).filename };
 				//if we are watching a single file, only that file should trigger action
 				return extracted_filename == _filename;
 			}
@@ -257,7 +275,7 @@ namespace filewatch {
 					FILE_NOTIFY_INFORMATION *file_information = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(&buffer[0]);
 					do
 					{
-						std::basic_string<typename T::value_type> changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
+						string_type changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
 						if (pass_filter(changed_file))
 						{
 							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
@@ -355,7 +373,7 @@ namespace filewatch {
 						struct inotify_event *event = (struct inotify_event *) &buffer[i];
 						if (event->len) 
 						{
-							const std::basic_string<typename T::value_type> changed_file{ event->name };
+							const string_type changed_file{ event->name };
 							if (pass_filter(changed_file))
 							{
 								if (event->mask & IN_CREATE) 

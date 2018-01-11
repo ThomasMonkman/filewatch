@@ -3,10 +3,12 @@
 #define _UNICODE
 #define UNICODE
 using test_string = std::wstring;
+using test_char = wchar_t*;
 #endif // _WIN32
 
 #if __unix__
 using test_string = std::string;
+using test_char = char*;
 #endif // __unix__
 
 #include "catch/catch.hpp"
@@ -55,3 +57,21 @@ TEST_CASE("single file", "[single-file]") {
 	auto path = testhelper::get_with_timeout(future);
 	REQUIRE(path == test_file_name);
 }
+
+#ifdef _WIN32
+TEST_CASE("base type", "[char]") {
+	const auto test_folder_path = _T("./");
+	const auto test_file_name = _T("test.txt");
+
+	std::promise<test_char> promise;
+	std::future<test_char> future = promise.get_future();
+	filewatch::FileWatch<test_char> watch(test_folder_path, [&promise](const test_char& path, const filewatch::Event change_type) {
+		promise.set_value(path);
+	});
+
+	testhelper::create_and_modify_file(test_file_name);
+
+	auto path = testhelper::get_with_timeout(future);
+	REQUIRE(path == test_file_name);
+}
+#endif
