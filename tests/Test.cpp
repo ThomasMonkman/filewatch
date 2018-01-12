@@ -59,19 +59,19 @@ TEST_CASE("single file", "[single-file]") {
 }
 
 #ifdef _WIN32
-TEST_CASE("base type", "[char]") {
-	const auto test_folder_path = _T("./");
-	const auto test_file_name = _T("test.txt");
-
-	std::promise<test_char> promise;
-	std::future<test_char> future = promise.get_future();
-	filewatch::FileWatch<test_char> watch(test_folder_path, [&promise](const test_char& path, const filewatch::Event change_type) {
-		promise.set_value(path);
-	});
-
-	testhelper::create_and_modify_file(test_file_name);
-
-	auto path = testhelper::get_with_timeout(future);
-	REQUIRE(path == test_file_name);
-}
+//TEST_CASE("base type", "[char]") {
+//	const auto test_folder_path = _T("./");
+//	const auto test_file_name = _T("test.txt");
+//
+//	std::promise<test_char> promise;
+//	std::future<test_char> future = promise.get_future();
+//	filewatch::FileWatch<test_char> watch(test_folder_path, [&promise](const test_char& path, const filewatch::Event change_type) {
+//		promise.set_value(path);
+//	});
+//
+//	testhelper::create_and_modify_file(test_file_name);
+//
+//	auto path = testhelper::get_with_timeout(future);
+//	REQUIRE(path == test_file_name);
+//}
 #endif
