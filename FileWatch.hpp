@@ -45,38 +45,18 @@ namespace filewatch {
 		renamed_new
 	};
 
-	//// if T is char or wchar_t
-	//template<
-	//	class T,
-	//	typename std::enable_if<std::is_integral<T>::value>::value
-	//>
-
-	// if T is std::string or std::wstring
-	template<
-		class T
-	>
-	class CrossPlatformStringWapper : public T
-	{
-		using T::T;
-	};
-
-
-	/*std::is_same<
-		T, std::basic_string<char, std::char_traits<char>>
-	>::value ||
-		std::is_same<
-		T, std::basic_string<wchar_t, std::char_traits<wchar_t>>
-		>::value*/
-	/*template<>
-	class CrossPlatformStringWapper<char, Args&&... args> : public std::basic_string<char, std::char_traits<char>>(std::forward<Args>(args)...) {};
-	template<>
-	class CrossPlatformStringWapper<wchar_t, Args&&... args> : public std::basic_string<wchar_t, std::char_traits<wchar_t>>(std::forward<Args>(args)...) {};*/
-
-	template<
-		class T
-	>
+	/**
+	* \class FileWatch
+	*
+	* \brief Watches a folder or file, and will notify of changes via function callback.
+	*
+	* \author Thomas Monkman
+	*
+	*/
+	template<class T>
 	class FileWatch
 	{
+		typedef std::basic_string<T::value_type, std::char_traits<T::value_type>> UnderpinningString;
 	public:
 		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
 			_path(path),
@@ -124,7 +104,7 @@ namespace filewatch {
 
 		// only used if watch a single file
 		bool _watching_single_file = { false };
-		CrossPlatformStringWapper<T> _filename;
+		T _filename;
 
 		std::atomic<bool> _destory = { false };
 		std::function<void(const T& file, const Event event_type)> _callback;
@@ -181,25 +161,25 @@ namespace filewatch {
 			};
 #ifdef _WIN32
 #define _UNICODE
-			const CrossPlatformStringWapper<T> this_directory = _T("./");
+			const UnderpinningString this_directory = _T("./");
 #elif __unix__
-			const CrossPlatformStringWapper<T> this_directory = "./";
+			const UnderpinningString this_directory = "./";
 #endif // __unix__
 			
 			const auto pivot = std::find_if(path.rbegin(), path.rend(), predict).base();
 			//if the path is something like "test.txt" there will be no directoy part, however we still need one, so insert './'
 			const T directory = [&]() {
-				const auto extracted_directory = CrossPlatformStringWapper<T>(path.begin(), pivot);
+				const auto extracted_directory = UnderpinningString(path.begin(), pivot);
 				return (extracted_directory.size() > 0) ? extracted_directory : this_directory;
 			}(); 
-			const T filename = CrossPlatformStringWapper<T>(pivot, path.end());
+			const T filename = UnderpinningString(pivot, path.end());
 			return PathParts(directory, filename);
 		}
 
-		bool pass_filter(const CrossPlatformStringWapper<T> file_path)
+		bool pass_filter(const UnderpinningString& file_path)
 		{ 
 			if (_watching_single_file) {
-				const CrossPlatformStringWapper<T> extracted_filename = { split_directory_and_file(file_path).filename };
+				const UnderpinningString extracted_filename = { split_directory_and_file(file_path).filename };
 				//if we are watching a single file, only that file should trigger action
 				return extracted_filename == _filename;
 			}
@@ -283,7 +263,7 @@ namespace filewatch {
 					FILE_NOTIFY_INFORMATION *file_information = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(&buffer[0]);
 					do
 					{
-						CrossPlatformStringWapper<T> changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
+						UnderpinningString changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
 						if (pass_filter(changed_file))
 						{
 							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
@@ -380,7 +360,7 @@ namespace filewatch {
 						struct inotify_event *event = (struct inotify_event *) &buffer[i];
 						if (event->len) 
 						{
-							const CrossPlatformStringWapper<T> changed_file{ event->name };
+							const UnderpinningString changed_file{ event->name };
 							if (pass_filter(changed_file))
 							{
 								if (event->mask & IN_CREATE) 
