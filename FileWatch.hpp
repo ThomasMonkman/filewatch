@@ -76,8 +76,7 @@ namespace filewatch {
 			_destory = true;
 #ifdef _WIN32
 			SetEvent(_close_event);
-#endif // WIN32
-#if __unix__
+#elif __unix__
 			inotify_rm_watch(_directory.folder, _directory.watch);
 #endif // __unix__
 			cv.notify_all();
@@ -85,10 +84,14 @@ namespace filewatch {
 			_callback_thread.join();
 #ifdef _WIN32
 			CloseHandle(_directory);
-#endif // WIN32
-#if __unix__
+#elif __unix__
 			close(_directory.folder);
 #endif // __unix__
+		}
+
+		FileWatch(const FileWatch& other) : FileWatch(other._path, other._callback)
+		{
+			
 		}
 
 	private:
@@ -98,7 +101,7 @@ namespace filewatch {
 			T directory;
 			T filename;
 		};
-		T _path;
+		const T _path;
 
 		static constexpr std::size_t _buffer_size = { 1024 * 256 };
 
@@ -304,7 +307,7 @@ namespace filewatch {
 
 		bool is_file(const T& path) const
 		{
-			struct stat statbuf;
+			struct stat statbuf = {};
 			if (stat(path.c_str(), &statbuf) != 0)
 			{
 				throw std::system_error(errno, std::system_category());
@@ -357,7 +360,7 @@ namespace filewatch {
 					std::vector<std::pair<T, Event>> parsed_information;
 					while (i < length) 
 					{
-						struct inotify_event *event = reinterpret_cast<struct inotify_event *>(&buffer[i]);
+						struct inotify_event *event = reinterpret_cast<struct inotify_event *>(&buffer[i]); // NOLINT
 						if (event->len) 
 						{
 							const UnderpinningString changed_file{ event->name };
