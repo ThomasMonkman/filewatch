@@ -357,7 +357,7 @@ namespace filewatch {
 					std::vector<std::pair<T, Event>> parsed_information;
 					while (i < length) 
 					{
-						struct inotify_event *event = (struct inotify_event *) &buffer[i];
+						struct inotify_event *event = static_cast<struct inotify_event *>(&buffer[i]);
 						if (event->len) 
 						{
 							const UnderpinningString changed_file{ event->name };
