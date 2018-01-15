@@ -17,7 +17,7 @@ matrix:
       #  - sudo apt-get -qq update
       #  - sudo apt-get install clang-tidy-5.0
       script:
-        - clang-tidy FileWatch.hpp -checks=-*,cppcoreguidelines-*
+        - clang-tidy FileWatch.hpp -checks=-*,cppcoreguidelines-* -- -std=c++11
 
     # works on Precise and Trusty
     - os: linux
