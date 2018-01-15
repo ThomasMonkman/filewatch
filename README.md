@@ -80,7 +80,7 @@ filewatch::FileWatch<std::filesystem::path> watch(
 filewatch::FileWatch<std::wstring> watch(
 	L"./test.txt"s, 
 	[](const std::wstring& path, const filewatch::Event change_type) {
-		std::wcout << std::filesystem::absolute(path) << L"\n";		
+		std::wcout << path << L"\n";		
 	}
 );
 ```
