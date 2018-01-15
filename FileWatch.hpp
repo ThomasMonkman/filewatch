@@ -56,7 +56,7 @@ namespace filewatch {
 	template<class T>
 	class FileWatch
 	{
-		typedef std::basic_string<T::value_type, std::char_traits<T::value_type>> UnderpinningString;
+		typedef std::basic_string<typename T::value_type, std::char_traits<typename T::value_type>> UnderpinningString;
 	public:
 		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
 			_path(path),
