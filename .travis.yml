@@ -5,6 +5,19 @@ script:
   - make CTEST_OUTPUT_ON_FAILURE=1 test
 matrix:
   include:
+    # Clang tidy
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-trusty-5.0
+          packages:
+            #- clang-tidy
+      before_install:
+        - sudo apt-get clang-tidy
+      script:
+        - clang-tidy FileWatch.hpp -checks=* -std=c++11
+
     # works on Precise and Trusty
     - os: linux
       addons:
@@ -81,15 +94,5 @@ matrix:
       env:
         - MATRIX_EVAL="CC=clang-5.0 && CXX=clang++-5.0"
 
-    # Clang tidy
-    - os: linux
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-trusty-5.0
-          packages:
-            - clang-tidy
-      script:
-        - clang-tidy FileWatch.hpp -checks=* -std=c++11
 before_install:
     - eval "${MATRIX_EVAL}"
