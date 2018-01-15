@@ -12,12 +12,12 @@ matrix:
           sources:
             - llvm-toolchain-trusty-5.0
           packages:
-            #- clang-tidy
-      before_install:
-        - sudo apt-get -qq update
-        - sudo apt-get install clang-tidy-5.0
+            - clang-tidy-5.0
+      #before_install:
+      #  - sudo apt-get -qq update
+      #  - sudo apt-get install clang-tidy-5.0
       script:
-        - clang-tidy FileWatch.hpp -checks=* -std=c++11
+        - clang-tidy FileWatch.hpp -checks=-*,cppcoreguidelines-*
 
     # works on Precise and Trusty
     - os: linux
