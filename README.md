@@ -55,7 +55,7 @@ filewatch::FileWatch<std::wstring> watch(
 );
 ```
 
-###### using std::filesystem: <a id="3"></a>
+###### Using std::filesystem: <a id="3"></a>
 ```cpp
 filewatch::FileWatch<std::filesystem::path> watch(
 	L"C:/Users/User/Desktop/Watch/Test"s, 
@@ -65,7 +65,7 @@ filewatch::FileWatch<std::filesystem::path> watch(
 );
 ```
 
-###### works with relative paths: <a id="4"></a>
+###### Works with relative paths: <a id="4"></a>
 ```cpp
 filewatch::FileWatch<std::filesystem::path> watch(
 	L"./"s, 
