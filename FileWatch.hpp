@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <tchar.h>
+#include <Pathcch.h>
+#include <shlwapi.h>
 #endif // WIN32
 
 #if __unix__
@@ -16,6 +18,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/inotify.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif // __unix__
 
@@ -30,8 +33,11 @@
 #include <map>
 #include <system_error>
 #include <string>
+#include <algorithm>
+#include <type_traits>
+
 namespace filewatch {
-	enum class ChangeType {
+	enum class Event {
 		added,
 		removed,
 		modified,
@@ -39,19 +45,26 @@ namespace filewatch {
 		renamed_new
 	};
 
+	/**
+	* \class FileWatch
+	*
+	* \brief Watches a folder or file, and will notify of changes via function callback.
+	*
+	* \author Thomas Monkman
+	*
+	*/
 	template<class T>
 	class FileWatch
 	{
+		typedef std::basic_string<typename T::value_type, std::char_traits<typename T::value_type>> UnderpinningString;
 	public:
-		FileWatch(T path, std::function<void(const T& file, const ChangeType change_type)> callback) :
+		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
 			_path(path),
 			_callback(callback),
-			_directory(get_directory())
-#ifdef _WIN32
-			, _close_event(CreateEvent(NULL, TRUE, FALSE, NULL))
-#endif // WIN32
+			_directory(get_directory(path))
 		{
 #ifdef _WIN32
+			_close_event = CreateEvent(NULL, TRUE, FALSE, NULL);
 			if (!_close_event) {
 				throw std::system_error(GetLastError(), std::system_category());
 			}
@@ -79,15 +92,28 @@ namespace filewatch {
 		}
 
 	private:
+		struct PathParts
+		{
+			PathParts(T directory, T filename) : directory(directory), filename(filename) {}
+			T directory;
+			T filename;
+		};
 		T _path;
+
+		static constexpr std::size_t _buffer_size = { 1024 * 256 };
+
+		// only used if watch a single file
+		bool _watching_single_file = { false };
+		T _filename;
+
 		std::atomic<bool> _destory = { false };
-		std::function<void(const T& file, const ChangeType change_type)> _callback;
+		std::function<void(const T& file, const Event event_type)> _callback;
 
 		std::thread _watch_thread;
 
 		std::condition_variable cv;
 		std::mutex _callback_mutex;
-		std::vector<std::pair<T, ChangeType>> _callback_information;
+		std::vector<std::pair<T, Event>> _callback_information;
 		std::thread _callback_thread;
 #ifdef _WIN32
 		HANDLE _directory = { nullptr };
@@ -103,12 +129,12 @@ namespace filewatch {
 			FILE_NOTIFY_CHANGE_DIR_NAME |
 			FILE_NOTIFY_CHANGE_FILE_NAME;
 
-		const std::map<DWORD, ChangeType> _change_type_mapping = {
-			{ FILE_ACTION_ADDED, ChangeType::added },
-			{ FILE_ACTION_REMOVED, ChangeType::removed },
-			{ FILE_ACTION_MODIFIED, ChangeType::modified },
-			{ FILE_ACTION_RENAMED_OLD_NAME, ChangeType::renamed_old },
-			{ FILE_ACTION_RENAMED_NEW_NAME, ChangeType::renamed_new }
+		const std::map<DWORD, Event> _event_type_mapping = {
+			{ FILE_ACTION_ADDED, Event::added },
+			{ FILE_ACTION_REMOVED, Event::removed },
+			{ FILE_ACTION_MODIFIED, Event::modified },
+			{ FILE_ACTION_RENAMED_OLD_NAME, Event::renamed_old },
+			{ FILE_ACTION_RENAMED_NEW_NAME, Event::renamed_new }
 		};
 #endif // WIN32
 
@@ -125,10 +151,66 @@ namespace filewatch {
 		const static std::size_t event_size = (sizeof(struct inotify_event));
 #endif // __unix__
 
+		const PathParts split_directory_and_file(const T& path) const {
+			const auto predict = [](typename T::value_type character) {
 #ifdef _WIN32
-		HANDLE get_directory() {
+				return character == _T('\\') || character == _T('/');
+#elif __unix__
+				return character == '/';
+#endif // __unix__
+			};
+#ifdef _WIN32
+#define _UNICODE
+			const UnderpinningString this_directory = _T("./");
+#elif __unix__
+			const UnderpinningString this_directory = "./";
+#endif // __unix__
+			
+			const auto pivot = std::find_if(path.rbegin(), path.rend(), predict).base();
+			//if the path is something like "test.txt" there will be no directoy part, however we still need one, so insert './'
+			const T directory = [&]() {
+				const auto extracted_directory = UnderpinningString(path.begin(), pivot);
+				return (extracted_directory.size() > 0) ? extracted_directory : this_directory;
+			}(); 
+			const T filename = UnderpinningString(pivot, path.end());
+			return PathParts(directory, filename);
+		}
+
+		bool pass_filter(const UnderpinningString& file_path)
+		{ 
+			if (_watching_single_file) {
+				const UnderpinningString extracted_filename = { split_directory_and_file(file_path).filename };
+				//if we are watching a single file, only that file should trigger action
+				return extracted_filename == _filename;
+			}
+			return true;
+		}
+
+#ifdef _WIN32
+		HANDLE get_directory(const T& path) {
+			auto file_info = GetFileAttributes(path.c_str());
+
+			if (file_info == INVALID_FILE_ATTRIBUTES)
+			{
+				throw std::system_error(GetLastError(), std::system_category());
+			}
+			_watching_single_file = (file_info & FILE_ATTRIBUTE_DIRECTORY) == false;
+
+			const T watch_path = [this, &path]() {
+				if (_watching_single_file)
+				{
+					const auto parsed_path = split_directory_and_file(path);
+					_filename = parsed_path.filename;
+					return parsed_path.directory;
+				}
+				else 
+				{
+					return path;
+				}
+			}();
+
 			HANDLE directory = ::CreateFile(
-				_path.c_str(),           // pointer to the file name
+				watch_path.c_str(),           // pointer to the file name
 				FILE_LIST_DIRECTORY,    // access (read/write) mode
 				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, // share mode
 				NULL, // security descriptor
@@ -143,7 +225,7 @@ namespace filewatch {
 			return directory;
 		}
 		void monitor_directory() {
-			std::vector<BYTE> buffer(1024 * 256);
+			std::vector<BYTE> buffer(_buffer_size);
 			DWORD bytes_returned = 0;
 			OVERLAPPED overlapped_buffer{ 0 };
 
@@ -156,7 +238,7 @@ namespace filewatch {
 
 			auto async_pending = false;
 			do {
-				std::vector<std::pair<T, ChangeType>> parsed_information;
+				std::vector<std::pair<T, Event>> parsed_information;
 				ReadDirectoryChangesW(
 					_directory,
 					buffer.data(), buffer.size(),
@@ -181,8 +263,11 @@ namespace filewatch {
 					FILE_NOTIFY_INFORMATION *file_information = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(&buffer[0]);
 					do
 					{
-						std::basic_string<typename T::value_type> filename{ file_information->FileName, file_information->FileNameLength / 2 };
-						parsed_information.emplace_back(T{ filename }, _change_type_mapping.at(file_information->Action));
+						UnderpinningString changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
+						if (pass_filter(changed_file))
+						{
+							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
+						}
 
 						if (file_information->NextEntryOffset == 0) {
 							break;
@@ -206,7 +291,6 @@ namespace filewatch {
 				cv.notify_all();
 			} while (_destory == false);
 
-
 			if (async_pending)
 			{
 				//clean up running async io
@@ -217,39 +301,80 @@ namespace filewatch {
 #endif // WIN32
 
 #if __unix__
-		FolderInfo get_directory() {
+
+		bool is_file(const T& path) const
+		{
+			struct stat statbuf;
+			if (stat(path.c_str(), &statbuf) != 0)
+			{
+				throw std::system_error(errno, std::system_category());
+			}
+			return S_ISREG(statbuf.st_mode);
+		}
+
+		FolderInfo get_directory(const T& path) 
+		{
 			const auto folder = inotify_init();
-			if (folder < 0) {
+			if (folder < 0) 
+			{
 				throw std::system_error(errno, std::system_category());
 			}
 			const auto listen_filters = _listen_filters;
-			const auto watch = inotify_add_watch(folder, _path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
-			if (watch < 0) {
+
+			_watching_single_file = is_file(path);
+
+			const T watch_path = [this, &path]() {
+				if (_watching_single_file)
+				{
+					const auto parsed_path = split_directory_and_file(path);
+					_filename = parsed_path.filename;
+					return parsed_path.directory;
+				}
+				else
+				{
+					return path;
+				}
+			}();
+
+			const auto watch = inotify_add_watch(folder, watch_path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
+			if (watch < 0) 
+			{
 				throw std::system_error(errno, std::system_category());
 			}
 			return { folder, watch };
 		}
 
-		void monitor_directory() {
-			std::vector<char> buffer(1024 * 256);
+		void monitor_directory() 
+		{
+			std::vector<char> buffer(_buffer_size);
 
-			while (_destory == false) {
+			while (_destory == false) 
+			{
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
-				if (length > 0) {
-					std::size_t i = 0;
-					std::vector<std::pair<T, ChangeType>> parsed_information;
-					while (i < length) {
-						struct inotify_event *event = (struct inotify_event *) &buffer[i];
-						if (event->len) {
-							const std::basic_string<typename T::value_type> filename{ event->name };
-							if (event->mask & IN_CREATE) {
-								parsed_information.emplace_back(T{ filename }, ChangeType::added);
-							}
-							else if (event->mask & IN_DELETE) {
-								parsed_information.emplace_back(T{ filename }, ChangeType::removed);
-							}
-							else if (event->mask & IN_MODIFY) {
-								parsed_information.emplace_back(T{ filename }, ChangeType::modified);
+				if (length > 0) 
+				{
+					int i = 0;
+					std::vector<std::pair<T, Event>> parsed_information;
+					while (i < length) 
+					{
+						struct inotify_event *event = reinterpret_cast<struct inotify_event *>(&buffer[i]);
+						if (event->len) 
+						{
+							const UnderpinningString changed_file{ event->name };
+							if (pass_filter(changed_file))
+							{
+								if (event->mask & IN_CREATE) 
+								{
+									parsed_information.emplace_back(T{ changed_file }, Event::added);
+								}
+								else if (event->mask & IN_DELETE) 
+								{
+									parsed_information.emplace_back(T{ changed_file }, Event::removed);
+								}
+								else if (event->mask & IN_MODIFY) 
+								{
+									parsed_information.emplace_back(T{ changed_file }, Event::modified);
+								}
 							}
 						}
 						i += event_size + event->len;
@@ -272,7 +397,8 @@ namespace filewatch {
 				if (_callback_information.empty() && _destory == false) {
 					cv.wait(lock, [this] { return _callback_information.size() > 0 || _destory; });
 				}
-				const auto callback_information = std::exchange(_callback_information, {});
+				decltype(_callback_information) callback_information = {};
+				std::swap(callback_information, _callback_information);
 				lock.unlock();
 
 				for (const auto& file : callback_information) {
