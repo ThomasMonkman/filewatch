@@ -14,7 +14,7 @@ matrix:
           packages:
             #- clang-tidy
       before_install:
-        - sudo apt-get clang-tidy
+        - sudo apt-get install clang-tidy
       script:
         - clang-tidy FileWatch.hpp -checks=* -std=c++11
 
