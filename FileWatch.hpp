@@ -89,9 +89,14 @@ namespace filewatch {
 #endif // __unix__
 		}
 
-		FileWatch(const FileWatch& other) : FileWatch(other._path, other._callback)
+		FileWatch(const FileWatch& other) : FileWatch(other._path, other._callback) {}
+
+		FileWatch& operator=(FileWatch other)
 		{
-			
+			std::cout << "copy assignment of A\n";
+			std::swap(n, other.n);
+			std::swap(s1, other.s1);
+			return *this;
 		}
 
 	private:

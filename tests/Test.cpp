@@ -79,6 +79,35 @@ TEST_CASE("copy constructor", "[constructors]") {
 		}
 	});
 
+	filewatch::FileWatch<test_string> watch2(watch);
+
+	testhelper::create_and_modify_file(test_file_name);
+
+	auto path = testhelper::get_with_timeout(future);
+	REQUIRE(path == test_file_name);
+	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const auto path) { return path == test_file_name});
+	REQUIRE(files_match);
+}
+
+
+TEST_CASE("copy assignment operator", "[operator]") {
+	const auto test_folder_path = testhelper::cross_platform_string("./");
+	const auto test_file_name = testhelper::cross_platform_string("test.txt");
+
+	std::promise<test_string> promise;
+	std::future<test_string> future = promise.get_future();
+	std::vector<test_string> files_triggered;
+	std::mutex mutex;
+	const auto expected_triggers = 4;
+
+	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &mutex](const test_string& path, const filewatch::Event change_type) {
+		std::lock_guard<std::mutex> lock(mutex);
+		files_triggered.push_back(path);
+		if (files_triggered.size() == expected_triggers) {
+			promise.set_value(path);
+		}
+	});
+
 	filewatch::FileWatch<test_string> watch2 = watch;
 
 	testhelper::create_and_modify_file(test_file_name);
