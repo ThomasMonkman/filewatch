@@ -63,39 +63,23 @@ namespace filewatch {
 			_callback(callback),
 			_directory(get_directory(path))
 		{
-#ifdef _WIN32
-			_close_event = CreateEvent(NULL, TRUE, FALSE, NULL);
-			if (!_close_event) {
-				throw std::system_error(GetLastError(), std::system_category());
-			}
-#endif // WIN32
-			_callback_thread = std::move(std::thread([this]() { callback_thread(); }));
-			_watch_thread = std::move(std::thread([this]() { monitor_directory(); }));
+			init();
 		}
 		~FileWatch() {
-			_destory = true;
-#ifdef _WIN32
-			SetEvent(_close_event);
-#elif __unix__
-			inotify_rm_watch(_directory.folder, _directory.watch);
-#endif // __unix__
-			cv.notify_all();
-			_watch_thread.join();
-			_callback_thread.join();
-#ifdef _WIN32
-			CloseHandle(_directory);
-#elif __unix__
-			close(_directory.folder);
-#endif // __unix__
+			destroy();
 		}
 
 		FileWatch(const FileWatch& other) : FileWatch(other._path, other._callback) {}
 
-		FileWatch& operator=(FileWatch other)
+		FileWatch& operator=(const FileWatch& other) 
 		{
-			std::cout << "copy assignment of A\n";
-			std::swap(n, other.n);
-			std::swap(s1, other.s1);
+			if (this == &other) { return *this; }
+
+			destroy();
+			_path = other._path;
+			_callback = other._callback;
+			_directory = get_directory(other._path);
+			init();
 			return *this;
 		}
 
@@ -159,7 +143,38 @@ namespace filewatch {
 		const static std::size_t event_size = (sizeof(struct inotify_event));
 #endif // __unix__
 
-		const PathParts split_directory_and_file(const T& path) const {
+		void init() 
+		{
+#ifdef _WIN32
+			_close_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+			if (!_close_event) {
+				throw std::system_error(GetLastError(), std::system_category());
+			}
+#endif // WIN32
+			_callback_thread = std::move(std::thread([this]() { callback_thread(); }));
+			_watch_thread = std::move(std::thread([this]() { monitor_directory(); }));
+		}
+
+		void destroy()
+		{
+			_destory = true;
+#ifdef _WIN32
+			SetEvent(_close_event);
+#elif __unix__
+			inotify_rm_watch(_directory.folder, _directory.watch);
+#endif // __unix__
+			cv.notify_all();
+			_watch_thread.join();
+			_callback_thread.join();
+#ifdef _WIN32
+			CloseHandle(_directory);
+#elif __unix__
+			close(_directory.folder);
+#endif // __unix__
+		}
+
+		const PathParts split_directory_and_file(const T& path) const 
+		{
 			const auto predict = [](typename T::value_type character) {
 #ifdef _WIN32
 				return character == _T('\\') || character == _T('/');
@@ -195,7 +210,8 @@ namespace filewatch {
 		}
 
 #ifdef _WIN32
-		HANDLE get_directory(const T& path) {
+		HANDLE get_directory(const T& path) 
+		{
 			auto file_info = GetFileAttributes(path.c_str());
 
 			if (file_info == INVALID_FILE_ATTRIBUTES)
@@ -232,7 +248,8 @@ namespace filewatch {
 			}
 			return directory;
 		}
-		void monitor_directory() {
+		void monitor_directory() 
+		{
 			std::vector<BYTE> buffer(_buffer_size);
 			DWORD bytes_returned = 0;
 			OVERLAPPED overlapped_buffer{ 0 };
