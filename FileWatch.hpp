@@ -1,9 +1,6 @@
 #ifndef FILEWATCHER_H
 #define FILEWATCHER_H
 
-#define __unix__
-#undef _WIN32
-
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
