@@ -88,39 +88,10 @@ namespace filewatch {
 			return *this;
 		}
 
+		// Const memeber varibles don't let me implent moves nicely, if moves are really wanted std::unique_ptr should be used and move that.
 		template<typename T>
-		friend void swap(FileWatch<T>& first, FileWatch<T>& second) noexcept// nothrow
-		{
-			// enable ADL (not necessary in our case, but good practice)
-			using std::swap;
-			{
-				std::lock(first._callback_mutex, second._callback_mutex);
-				std::lock_guard<std::mutex> lk1(first._callback_mutex, std::adopt_lock);
-				std::lock_guard<std::mutex> lk2(second._callback_mutex, std::adopt_lock);
-
-				swap(first._path, second._path);
-				swap(first._directory, second._directory);
-				
-				swap(first._watching_single_file, second._watching_single_file);
-				swap(first._filename, second._filename);
-
-				swap(first._listen_filters, second._listen_filters);
-
-				swap(first._callback, second._callback);
-				swap(first._callback_information, second._callback_information);
-				
-				swap(first._cv, second._cv);
-#ifdef _WIN32
-				swap(first._event_type_mapping, second._event_type_mapping);
-				swap(first._close_event, second._close_event);
-#endif //_WIN32
-				swap(first._destory, second._destory);
-				swap(first._callback_thread, second._callback_thread);
-				swap(first._watch_thread, second._watch_thread);
-			}
-			swap(first._callback_mutex, second._callback_mutex);
-		}
-
+		FileWatch<T>(FileWatch<T>&&) = delete;
+		FileWatch<T>& operator=(FileWatch<T>&&) & = delete;
 
 	private:
 		struct PathParts
