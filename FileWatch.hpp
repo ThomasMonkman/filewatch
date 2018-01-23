@@ -1,6 +1,9 @@
 #ifndef FILEWATCHER_H
 #define FILEWATCHER_H
 
+#define __unix__
+#undef _WIN32
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -69,9 +72,11 @@ namespace filewatch {
 			destroy();
 		}
 
-		FileWatch(const FileWatch& other) : FileWatch(other._path, other._callback) {}
+		template<typename T>
+		FileWatch(const FileWatch<T>& other) : FileWatch<T>(other._path, other._callback) {}
 
-		FileWatch& operator=(const FileWatch& other) 
+		template<typename T>
+		FileWatch<T>& operator=(const FileWatch<T>& other) 
 		{
 			if (this == &other) { return *this; }
 
@@ -82,6 +87,40 @@ namespace filewatch {
 			init();
 			return *this;
 		}
+
+		template<typename T>
+		friend void swap(FileWatch<T>& first, FileWatch<T>& second) noexcept// nothrow
+		{
+			// enable ADL (not necessary in our case, but good practice)
+			using std::swap;
+			{
+				std::lock(first._callback_mutex, second._callback_mutex);
+				std::lock_guard<std::mutex> lk1(first._callback_mutex, std::adopt_lock);
+				std::lock_guard<std::mutex> lk2(second._callback_mutex, std::adopt_lock);
+
+				swap(first._path, second._path);
+				swap(first._directory, second._directory);
+				
+				swap(first._watching_single_file, second._watching_single_file);
+				swap(first._filename, second._filename);
+
+				swap(first._listen_filters, second._listen_filters);
+
+				swap(first._callback, second._callback);
+				swap(first._callback_information, second._callback_information);
+				
+				swap(first._cv, second._cv);
+#ifdef _WIN32
+				swap(first._event_type_mapping, second._event_type_mapping);
+				swap(first._close_event, second._close_event);
+#endif //_WIN32
+				swap(first._destory, second._destory);
+				swap(first._callback_thread, second._callback_thread);
+				swap(first._watch_thread, second._watch_thread);
+			}
+			swap(first._callback_mutex, second._callback_mutex);
+		}
+
 
 	private:
 		struct PathParts
@@ -103,7 +142,7 @@ namespace filewatch {
 
 		std::thread _watch_thread;
 
-		std::condition_variable cv;
+		std::condition_variable _cv;
 		std::mutex _callback_mutex;
 		std::vector<std::pair<T, Event>> _callback_information;
 		std::thread _callback_thread;
@@ -163,7 +202,7 @@ namespace filewatch {
 #elif __unix__
 			inotify_rm_watch(_directory.folder, _directory.watch);
 #endif // __unix__
-			cv.notify_all();
+			_cv.notify_all();
 			_watch_thread.join();
 			_callback_thread.join();
 #ifdef _WIN32
@@ -313,7 +352,7 @@ namespace filewatch {
 					std::lock_guard<std::mutex> lock(_callback_mutex);
 					_callback_information.insert(_callback_information.end(), parsed_information.begin(), parsed_information.end());
 				}
-				cv.notify_all();
+				_cv.notify_all();
 			} while (_destory == false);
 
 			if (async_pending)
@@ -409,7 +448,7 @@ namespace filewatch {
 						std::lock_guard<std::mutex> lock(_callback_mutex);
 						_callback_information.insert(_callback_information.end(), parsed_information.begin(), parsed_information.end());
 					}
-					cv.notify_all();
+					_cv.notify_all();
 				}
 			}
 		}
@@ -420,7 +459,7 @@ namespace filewatch {
 			while (_destory == false) {
 				std::unique_lock<std::mutex> lock(_callback_mutex);
 				if (_callback_information.empty() && _destory == false) {
-					cv.wait(lock, [this] { return _callback_information.size() > 0 || _destory; });
+					_cv.wait(lock, [this] { return _callback_information.size() > 0 || _destory; });
 				}
 				decltype(_callback_information) callback_information = {};
 				std::swap(callback_information, _callback_information);
