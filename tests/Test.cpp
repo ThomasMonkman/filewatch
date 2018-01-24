@@ -71,7 +71,7 @@ TEST_CASE("copy constructor", "[constructors]") {
 	std::mutex mutex;
 	const auto expected_triggers = 4;
 
-	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &mutex](const test_string& path, const filewatch::Event change_type) {
+	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &expected_triggers, &mutex](const test_string& path, const filewatch::Event change_type) {
 		std::lock_guard<std::mutex> lock(mutex);
 		files_triggered.push_back(path);
 		if (files_triggered.size() == expected_triggers) {
@@ -85,7 +85,7 @@ TEST_CASE("copy constructor", "[constructors]") {
 
 	auto path = testhelper::get_with_timeout(future);
 	REQUIRE(path == test_file_name);
-	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name});
+	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name; });
 	REQUIRE(files_match);
 }
 
@@ -100,7 +100,7 @@ TEST_CASE("copy assignment operator", "[operator]") {
 	std::mutex mutex;
 	const auto expected_triggers = 4;
 
-	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &mutex](const test_string& path, const filewatch::Event change_type) {
+	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &expected_triggers, &mutex](const test_string& path, const filewatch::Event change_type) {
 		std::lock_guard<std::mutex> lock(mutex);
 		files_triggered.push_back(path);
 		if (files_triggered.size() == expected_triggers) {
@@ -114,7 +114,7 @@ TEST_CASE("copy assignment operator", "[operator]") {
 
 	auto path = testhelper::get_with_timeout(future);
 	REQUIRE(path == test_file_name);
-	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name});
+	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name; });
 	REQUIRE(files_match);
 }
 
