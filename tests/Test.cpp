@@ -85,7 +85,7 @@ TEST_CASE("copy constructor", "[constructors]") {
 
 	auto path = testhelper::get_with_timeout(future);
 	REQUIRE(path == test_file_name);
-	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const auto path) { return path == test_file_name});
+	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name});
 	REQUIRE(files_match);
 }
 
