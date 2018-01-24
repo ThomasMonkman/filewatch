@@ -69,7 +69,7 @@ TEST_CASE("copy constructor", "[constructors]") {
 	std::future<test_string> future = promise.get_future();
 	std::vector<test_string> files_triggered;
 	std::mutex mutex;
-	const auto expected_triggers = 4;
+	const auto expected_triggers = 4u;
 
 	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &expected_triggers, &mutex](const test_string& path, const filewatch::Event change_type) {
 		std::lock_guard<std::mutex> lock(mutex);
@@ -98,7 +98,7 @@ TEST_CASE("copy assignment operator", "[operator]") {
 	std::future<test_string> future = promise.get_future();
 	std::vector<test_string> files_triggered;
 	std::mutex mutex;
-	const auto expected_triggers = 4;
+	const auto expected_triggers = 4u;
 
 	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &expected_triggers, &mutex](const test_string& path, const filewatch::Event change_type) {
 		std::lock_guard<std::mutex> lock(mutex);
