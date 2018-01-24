@@ -69,10 +69,8 @@ namespace filewatch {
 			destroy();
 		}
 
-		template<typename T>
 		FileWatch(const FileWatch<T>& other) : FileWatch<T>(other._path, other._callback) {}
 
-		template<typename T>
 		FileWatch<T>& operator=(const FileWatch<T>& other) 
 		{
 			if (this == &other) { return *this; }
@@ -86,7 +84,6 @@ namespace filewatch {
 		}
 
 		// Const memeber varibles don't let me implent moves nicely, if moves are really wanted std::unique_ptr should be used and move that.
-		template<typename T>
 		FileWatch<T>(FileWatch<T>&&) = delete;
 		FileWatch<T>& operator=(FileWatch<T>&&) & = delete;
 
