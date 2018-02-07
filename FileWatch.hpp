@@ -35,6 +35,7 @@
 #include <string>
 #include <algorithm>
 #include <type_traits>
+#include <future>
 
 namespace filewatch {
 	enum class Event {
@@ -111,6 +112,8 @@ namespace filewatch {
 		std::mutex _callback_mutex;
 		std::vector<std::pair<T, Event>> _callback_information;
 		std::thread _callback_thread;
+
+		std::promise<void> _running;
 #ifdef _WIN32
 		HANDLE _directory = { nullptr };
 		HANDLE _close_event = { nullptr };
@@ -155,8 +158,29 @@ namespace filewatch {
 				throw std::system_error(GetLastError(), std::system_category());
 			}
 #endif // WIN32
-			_callback_thread = std::move(std::thread([this]() { callback_thread(); }));
-			_watch_thread = std::move(std::thread([this]() { monitor_directory(); }));
+			_callback_thread = std::move(std::thread([this]() {
+				try {
+					callback_thread();
+				} catch (...) {
+					try {
+						_running.set_exception(std::current_exception());
+					}
+					catch (...) {} // set_exception() may throw too
+				}
+			}));
+			_watch_thread = std::move(std::thread([this]() { 
+				try {
+					monitor_directory();
+				} catch (...) {
+					try {
+						_running.set_exception(std::current_exception());
+					}
+					catch (...) {} // set_exception() may throw too
+				}
+			}));
+
+			std::future<void> future = _running.get_future();
+			future.get(); //block until the monitor_directory is up and running
 		}
 
 		void destroy()
@@ -276,12 +300,13 @@ namespace filewatch {
 					&bytes_returned,
 					&overlapped_buffer, NULL);
 				async_pending = true;
+				_running.set_value();
 				switch (WaitForMultipleObjects(2, handles.data(), FALSE, INFINITE))
 				{
 				case WAIT_OBJECT_0:
 				{
 					if (!GetOverlappedResult(_directory, &overlapped_buffer, &bytes_returned, TRUE)) {
-
+						throw std::system_error(GetLastError(), std::system_category());
 					}
 					async_pending = false;
 
@@ -379,6 +404,7 @@ namespace filewatch {
 
 			while (_destory == false) 
 			{
+				_running.set_value();
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
 				if (length > 0) 
 				{
