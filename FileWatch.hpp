@@ -1,3 +1,25 @@
+//	MIT License
+//	
+//	Copyright(c) 2017 Thomas Monkman
+//	
+//	Permission is hereby granted, free of charge, to any person obtaining a copy
+//	of this software and associated documentation files(the "Software"), to deal
+//	in the Software without restriction, including without limitation the rights
+//	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//	copies of the Software, and to permit persons to whom the Software is
+//	furnished to do so, subject to the following conditions :
+//	
+//	The above copyright notice and this permission notice shall be included in all
+//	copies or substantial portions of the Software.
+//	
+//	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
+//	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//	SOFTWARE.
+
 #ifndef FILEWATCHER_H
 #define FILEWATCHER_H
 
@@ -35,6 +57,7 @@
 #include <string>
 #include <algorithm>
 #include <type_traits>
+#include <future>
 
 namespace filewatch {
 	enum class Event {
@@ -63,33 +86,29 @@ namespace filewatch {
 			_callback(callback),
 			_directory(get_directory(path))
 		{
-#ifdef _WIN32
-			_close_event = CreateEvent(NULL, TRUE, FALSE, NULL);
-			if (!_close_event) {
-				throw std::system_error(GetLastError(), std::system_category());
-			}
-#endif // WIN32
-			_callback_thread = std::move(std::thread([this]() { callback_thread(); }));
-			_watch_thread = std::move(std::thread([this]() { monitor_directory(); }));
+			init();
 		}
 		~FileWatch() {
-			_destory = true;
-#ifdef _WIN32
-			SetEvent(_close_event);
-#endif // WIN32
-#if __unix__
-			inotify_rm_watch(_directory.folder, _directory.watch);
-#endif // __unix__
-			cv.notify_all();
-			_watch_thread.join();
-			_callback_thread.join();
-#ifdef _WIN32
-			CloseHandle(_directory);
-#endif // WIN32
-#if __unix__
-			close(_directory.folder);
-#endif // __unix__
+			destroy();
 		}
+
+		FileWatch(const FileWatch<T>& other) : FileWatch<T>(other._path, other._callback) {}
+
+		FileWatch<T>& operator=(const FileWatch<T>& other) 
+		{
+			if (this == &other) { return *this; }
+
+			destroy();
+			_path = other._path;
+			_callback = other._callback;
+			_directory = get_directory(other._path);
+			init();
+			return *this;
+		}
+
+		// Const memeber varibles don't let me implent moves nicely, if moves are really wanted std::unique_ptr should be used and move that.
+		FileWatch<T>(FileWatch<T>&&) = delete;
+		FileWatch<T>& operator=(FileWatch<T>&&) & = delete;
 
 	private:
 		struct PathParts
@@ -98,7 +117,7 @@ namespace filewatch {
 			T directory;
 			T filename;
 		};
-		T _path;
+		const T _path;
 
 		static constexpr std::size_t _buffer_size = { 1024 * 256 };
 
@@ -111,10 +130,12 @@ namespace filewatch {
 
 		std::thread _watch_thread;
 
-		std::condition_variable cv;
+		std::condition_variable _cv;
 		std::mutex _callback_mutex;
 		std::vector<std::pair<T, Event>> _callback_information;
 		std::thread _callback_thread;
+
+		std::promise<void> _running;
 #ifdef _WIN32
 		HANDLE _directory = { nullptr };
 		HANDLE _close_event = { nullptr };
@@ -151,7 +172,60 @@ namespace filewatch {
 		const static std::size_t event_size = (sizeof(struct inotify_event));
 #endif // __unix__
 
-		const PathParts split_directory_and_file(const T& path) const {
+		void init() 
+		{
+#ifdef _WIN32
+			_close_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+			if (!_close_event) {
+				throw std::system_error(GetLastError(), std::system_category());
+			}
+#endif // WIN32
+			_callback_thread = std::move(std::thread([this]() {
+				try {
+					callback_thread();
+				} catch (...) {
+					try {
+						_running.set_exception(std::current_exception());
+					}
+					catch (...) {} // set_exception() may throw too
+				}
+			}));
+			_watch_thread = std::move(std::thread([this]() { 
+				try {
+					monitor_directory();
+				} catch (...) {
+					try {
+						_running.set_exception(std::current_exception());
+					}
+					catch (...) {} // set_exception() may throw too
+				}
+			}));
+
+			std::future<void> future = _running.get_future();
+			future.get(); //block until the monitor_directory is up and running
+		}
+
+		void destroy()
+		{
+			_destory = true;
+			_running = std::promise<void>();
+#ifdef _WIN32
+			SetEvent(_close_event);
+#elif __unix__
+			inotify_rm_watch(_directory.folder, _directory.watch);
+#endif // __unix__
+			_cv.notify_all();
+			_watch_thread.join();
+			_callback_thread.join();
+#ifdef _WIN32
+			CloseHandle(_directory);
+#elif __unix__
+			close(_directory.folder);
+#endif // __unix__
+		}
+
+		const PathParts split_directory_and_file(const T& path) const 
+		{
 			const auto predict = [](typename T::value_type character) {
 #ifdef _WIN32
 				return character == _T('\\') || character == _T('/');
@@ -187,7 +261,8 @@ namespace filewatch {
 		}
 
 #ifdef _WIN32
-		HANDLE get_directory(const T& path) {
+		HANDLE get_directory(const T& path) 
+		{
 			auto file_info = GetFileAttributes(path.c_str());
 
 			if (file_info == INVALID_FILE_ATTRIBUTES)
@@ -224,7 +299,8 @@ namespace filewatch {
 			}
 			return directory;
 		}
-		void monitor_directory() {
+		void monitor_directory() 
+		{
 			std::vector<BYTE> buffer(_buffer_size);
 			DWORD bytes_returned = 0;
 			OVERLAPPED overlapped_buffer{ 0 };
@@ -237,6 +313,7 @@ namespace filewatch {
 			std::array<HANDLE, 2> handles{ overlapped_buffer.hEvent, _close_event };
 
 			auto async_pending = false;
+			_running.set_value();
 			do {
 				std::vector<std::pair<T, Event>> parsed_information;
 				ReadDirectoryChangesW(
@@ -246,13 +323,15 @@ namespace filewatch {
 					_listen_filters,
 					&bytes_returned,
 					&overlapped_buffer, NULL);
+			
 				async_pending = true;
+			
 				switch (WaitForMultipleObjects(2, handles.data(), FALSE, INFINITE))
 				{
 				case WAIT_OBJECT_0:
 				{
 					if (!GetOverlappedResult(_directory, &overlapped_buffer, &bytes_returned, TRUE)) {
-
+						throw std::system_error(GetLastError(), std::system_category());
 					}
 					async_pending = false;
 
@@ -288,7 +367,7 @@ namespace filewatch {
 					std::lock_guard<std::mutex> lock(_callback_mutex);
 					_callback_information.insert(_callback_information.end(), parsed_information.begin(), parsed_information.end());
 				}
-				cv.notify_all();
+				_cv.notify_all();
 			} while (_destory == false);
 
 			if (async_pending)
@@ -304,7 +383,7 @@ namespace filewatch {
 
 		bool is_file(const T& path) const
 		{
-			struct stat statbuf;
+			struct stat statbuf = {};
 			if (stat(path.c_str(), &statbuf) != 0)
 			{
 				throw std::system_error(errno, std::system_category());
@@ -348,6 +427,7 @@ namespace filewatch {
 		{
 			std::vector<char> buffer(_buffer_size);
 
+			_running.set_value();
 			while (_destory == false) 
 			{
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
@@ -357,7 +437,7 @@ namespace filewatch {
 					std::vector<std::pair<T, Event>> parsed_information;
 					while (i < length) 
 					{
-						struct inotify_event *event = reinterpret_cast<struct inotify_event *>(&buffer[i]);
+						struct inotify_event *event = reinterpret_cast<struct inotify_event *>(&buffer[i]); // NOLINT
 						if (event->len) 
 						{
 							const UnderpinningString changed_file{ event->name };
@@ -384,7 +464,7 @@ namespace filewatch {
 						std::lock_guard<std::mutex> lock(_callback_mutex);
 						_callback_information.insert(_callback_information.end(), parsed_information.begin(), parsed_information.end());
 					}
-					cv.notify_all();
+					_cv.notify_all();
 				}
 			}
 		}
@@ -395,7 +475,7 @@ namespace filewatch {
 			while (_destory == false) {
 				std::unique_lock<std::mutex> lock(_callback_mutex);
 				if (_callback_information.empty() && _destory == false) {
-					cv.wait(lock, [this] { return _callback_information.size() > 0 || _destory; });
+					_cv.wait(lock, [this] { return _callback_information.size() > 0 || _destory; });
 				}
 				decltype(_callback_information) callback_information = {};
 				std::swap(callback_information, _callback_information);
