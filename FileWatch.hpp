@@ -1,3 +1,25 @@
+//	MIT License
+//	
+//	Copyright(c) 2017 Thomas Monkman
+//	
+//	Permission is hereby granted, free of charge, to any person obtaining a copy
+//	of this software and associated documentation files(the "Software"), to deal
+//	in the Software without restriction, including without limitation the rights
+//	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//	copies of the Software, and to permit persons to whom the Software is
+//	furnished to do so, subject to the following conditions :
+//	
+//	The above copyright notice and this permission notice shall be included in all
+//	copies or substantial portions of the Software.
+//	
+//	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
+//	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//	SOFTWARE.
+
 #ifndef FILEWATCHER_H
 #define FILEWATCHER_H
 
@@ -186,6 +208,7 @@ namespace filewatch {
 		void destroy()
 		{
 			_destory = true;
+			_running = std::promise<void>();
 #ifdef _WIN32
 			SetEvent(_close_event);
 #elif __unix__
@@ -290,6 +313,7 @@ namespace filewatch {
 			std::array<HANDLE, 2> handles{ overlapped_buffer.hEvent, _close_event };
 
 			auto async_pending = false;
+			_running.set_value();
 			do {
 				std::vector<std::pair<T, Event>> parsed_information;
 				ReadDirectoryChangesW(
@@ -299,8 +323,9 @@ namespace filewatch {
 					_listen_filters,
 					&bytes_returned,
 					&overlapped_buffer, NULL);
+			
 				async_pending = true;
-				_running.set_value();
+			
 				switch (WaitForMultipleObjects(2, handles.data(), FALSE, INFINITE))
 				{
 				case WAIT_OBJECT_0:
@@ -402,9 +427,9 @@ namespace filewatch {
 		{
 			std::vector<char> buffer(_buffer_size);
 
+			_running.set_value();
 			while (_destory == false) 
 			{
-				_running.set_value();
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
 				if (length > 0) 
 				{
