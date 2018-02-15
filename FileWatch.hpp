@@ -97,7 +97,7 @@ namespace filewatch {
 #if defined _WIN32 && (defined UNICODE || defined _UNICODE)
 		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
 			FileWatch<T>(path, UnderpinningRegex(L".*"), callback) {}
-#elif // _WIN32 && (UNICODE || _UNICODE)
+#else // _WIN32 && (UNICODE || _UNICODE)
 		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
 			FileWatch<T>(path, UnderpinningRegex(".*"), callback) {}
 #endif
