@@ -58,6 +58,7 @@
 #include <algorithm>
 #include <type_traits>
 #include <future>
+#include <regex>
 
 namespace filewatch {
 	enum class Event {
@@ -80,14 +81,27 @@ namespace filewatch {
 	class FileWatch
 	{
 		typedef std::basic_string<typename T::value_type, std::char_traits<typename T::value_type>> UnderpinningString;
+		typedef std::basic_regex<typename T::value_type, std::regex_traits<typename T::value_type>> UnderpinningRegex;
+
+#if defined _WIN32 && (defined UNICODE || defined _UNICODE)
+		inline const auto match_any = L".*";
+#elif // _WIN32 && (UNICODE || _UNICODE)
+		const auto match_any = { ".*"s };
+#endif
 	public:
-		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
+
+		FileWatch(T path, UnderpinningRegex pattern, std::function<void(const T& file, const Event event_type)> callback) :
 			_path(path),
+			_pattern(pattern),
 			_callback(callback),
 			_directory(get_directory(path))
 		{
 			init();
 		}
+
+		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
+			FileWatch<T>(path, UnderpinningRegex(match_any), callback) {}
+
 		~FileWatch() {
 			destroy();
 		}
@@ -118,6 +132,8 @@ namespace filewatch {
 			T filename;
 		};
 		const T _path;
+
+		UnderpinningRegex _pattern;
 
 		static constexpr std::size_t _buffer_size = { 1024 * 256 };
 
@@ -257,7 +273,8 @@ namespace filewatch {
 				//if we are watching a single file, only that file should trigger action
 				return extracted_filename == _filename;
 			}
-			return true;
+			const auto found = std::regex_search(file_path, _pattern);
+			return found;
 		}
 
 #ifdef _WIN32

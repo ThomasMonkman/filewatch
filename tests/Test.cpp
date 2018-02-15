@@ -23,6 +23,7 @@ using test_char = char*;
 #include <vector>
 #include <set>
 #include <thread>
+#include <regex>
 
 TEST_CASE("watch for file add", "[added]") {
 	const auto test_folder_path = testhelper::cross_platform_string("./");
@@ -120,6 +121,28 @@ TEST_CASE("copy assignment operator", "[operator]") {
 	testhelper::get_with_timeout(future);
 	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name; });
 	REQUIRE(files_match);
+}
+
+TEST_CASE("regex", "[regex]") {
+	const auto test_folder_path = testhelper::cross_platform_string("./");
+	const auto test_ignore_path = testhelper::cross_platform_string("./ignore.txt");
+	const auto test_file_name = testhelper::cross_platform_string("test.txt");
+	// create the file otherwise the Filewatch will throw
+	testhelper::create_and_modify_file(test_file_name);
+
+	std::promise<test_string> promise;
+	std::future<test_string> future = promise.get_future();
+
+	filewatch::FileWatch<test_string> watch(test_folder_path, std::wregex(L"test.*"),[&promise, &test_file_name](const test_string& path, const filewatch::Event change_type) {
+		REQUIRE(path == test_file_name);
+		promise.set_value(path);
+	});
+
+	testhelper::create_and_modify_file(test_ignore_path);
+	testhelper::create_and_modify_file(test_file_name);
+
+	auto path = testhelper::get_with_timeout(future);
+	REQUIRE(path == test_file_name);
 }
 
 #ifdef _WIN32
