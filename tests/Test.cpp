@@ -1,14 +1,17 @@
 #include <string>
+#include <regex>
 #ifdef _WIN32
 #define _UNICODE
 #define UNICODE
 using test_string = std::wstring;
 using test_char = wchar_t*;
+using test_regex = std::wregex;
 #endif // _WIN32
 
 #if __unix__
 using test_string = std::string;
 using test_char = char*;
+using test_regex = std::regex;
 #endif // __unix__
 
 #include "catch/catch.hpp"
@@ -23,7 +26,6 @@ using test_char = char*;
 #include <vector>
 #include <set>
 #include <thread>
-#include <regex>
 
 TEST_CASE("watch for file add", "[added]") {
 	const auto test_folder_path = testhelper::cross_platform_string("./");
@@ -133,7 +135,7 @@ TEST_CASE("regex", "[regex]") {
 	std::promise<test_string> promise;
 	std::future<test_string> future = promise.get_future();
 
-	filewatch::FileWatch<test_string> watch(test_folder_path, std::wregex(L"test.*"),[&promise, &test_file_name](const test_string& path, const filewatch::Event change_type) {
+	filewatch::FileWatch<test_string> watch(test_folder_path, test_regex(testhelper::cross_platform_string("test.*")),[&promise, &test_file_name](const test_string& path, const filewatch::Event change_type) {
 		REQUIRE(path == test_file_name);
 		promise.set_value(path);
 	});
