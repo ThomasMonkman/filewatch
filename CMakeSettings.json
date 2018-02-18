@@ -46,7 +46,7 @@
       "ctestCommandArgs": ""
     },
     {
-      "name": "Linux-Debug",
+      "name": "Linux-Debug-Default",
       "generator": "Unix Makefiles",
       "remoteMachineName": "${defaultRemoteMachineName}",
       "configurationType": "Debug",
@@ -61,6 +61,33 @@
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "linux-x64" ]
+    },
+    {
+      "name": "Linux-Debug-Clang",
+      "generator": "Unix Makefiles",
+      "remoteMachineName": "${defaultRemoteMachineName}",
+      "configurationType": "Debug",
+      "remoteCMakeListsRoot": "/var/tmp/src/${workspaceHash}/${name}",
+      "cmakeExecutable": "/usr/local/bin/cmake",
+      "buildRoot": "${env.LOCALAPPDATA}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",
+      "remoteBuildRoot": "/var/tmp/build/${workspaceHash}/build/${name}",
+      "remoteCopySources": true,
+      "remoteCopySourcesOutputVerbosity": "Normal",
+      "remoteCopySourcesConcurrentCopies": "10",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "linux-x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_C_COMPILER",
+          "value": "/usr/bin/clang-5.0"
+        },
+        {
+          "name": "CMAKE_CXX_COMPILER",
+          "value": "/usr/bin/clang++-5.0"
+        }
+      ]
     }
   ]
 }
