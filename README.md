@@ -5,15 +5,16 @@
 | **Master**    | [![Master](https://travis-ci.org/ThomasMonkman/filewatch.svg?branch=master)](https://travis-ci.org/ThomasMonkman/filewatch) |
 | **Develop**   | [![Develop](https://travis-ci.org/ThomasMonkman/filewatch.svg?branch=develop)](https://travis-ci.org/ThomasMonkman/filewatch) |
 
-Single header folder/file watcher in C++11 for windows and linux
+Single header folder/file watcher in C++11 for windows and linux, with optional regex filtering
 #### Install:
 Drop [FileWatch.hpp](https://github.com/ThomasMonkman/filewatch/blob/master/FileWatch.hpp) in to your include path, and you should be good to go.
 #### Examples:
 - [Simple](#1)
 - [Change Type](#2)
-- [Using std::filesystem](#3)
-- [Works with relative paths](#4)
-- [Single file watch](#5)
+- [Regex](#3)
+- [Using std::filesystem](#4)
+- [Works with relative paths](#5)
+- [Single file watch](#6)
 
 On linux or none unicode windows change std::wstring for std::string or std::filesystem (boost should work as well).
 
@@ -55,7 +56,20 @@ filewatch::FileWatch<std::wstring> watch(
 );
 ```
 
-###### Using std::filesystem: <a id="3"></a>
+###### Regex: <a id="3"></a>
+
+Using the standard regex libary you can filter the file paths that will trigger. When using wstring you will have to use `std::wregex`
+```cpp
+filewatch::FileWatch<std::wstring> watch(
+	L"C:/Users/User/Desktop/Watch/Test"s,
+	std::wregex(L"test.*"),
+	[](const std::wstring& path, const filewatch::Event change_type) {
+		std::wcout << path << L"\n";
+	}
+);
+```
+
+###### Using std::filesystem: <a id="4"></a>
 ```cpp
 filewatch::FileWatch<std::filesystem::path> watch(
 	L"C:/Users/User/Desktop/Watch/Test"s, 
@@ -65,7 +79,7 @@ filewatch::FileWatch<std::filesystem::path> watch(
 );
 ```
 
-###### Works with relative paths: <a id="4"></a>
+###### Works with relative paths: <a id="5"></a>
 ```cpp
 filewatch::FileWatch<std::filesystem::path> watch(
 	L"./"s, 
@@ -75,7 +89,7 @@ filewatch::FileWatch<std::filesystem::path> watch(
 );
 ```
 
-###### Single file watch: <a id="5"></a>
+###### Single file watch: <a id="6"></a>
 ```cpp
 filewatch::FileWatch<std::wstring> watch(
 	L"./test.txt"s, 
