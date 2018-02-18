@@ -273,7 +273,7 @@ namespace filewatch {
 				//if we are watching a single file, only that file should trigger action
 				return extracted_filename == _filename;
 			}
-			return std::regex_search(file_path, _pattern);
+			return true;// std::regex_search(file_path, _pattern);
 		}
 
 #ifdef _WIN32
