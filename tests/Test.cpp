@@ -147,6 +147,25 @@ TEST_CASE("regex", "[regex]") {
 	REQUIRE(path == test_file_name);
 }
 
+TEST_CASE("init all files", "[auto_init]") {
+	const auto test_folder_path = testhelper::cross_platform_string("./");
+	const std::vector<test_string> test_files = { "1.test", "2.test" };
+	
+	for (const auto& file : test_files) {
+		testhelper::create_and_modify_file(file);
+	}
+
+	std::promise<test_string> promise;
+	std::future<test_string> future = promise.get_future();
+
+	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise](const test_string& path, const filewatch::Event change_type) {
+		promise.set_value(path);
+	});
+
+
+	auto path = testhelper::get_with_timeout(future);
+}
+
 #ifdef _WIN32
 //TEST_CASE("base type", "[char]") {
 //	const auto test_folder_path = _T("./");

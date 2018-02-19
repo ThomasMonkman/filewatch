@@ -85,21 +85,22 @@ namespace filewatch {
 
 	public:
 
-		FileWatch(T path, UnderpinningRegex pattern, std::function<void(const T& file, const Event event_type)> callback) :
+		FileWatch(T path, UnderpinningRegex pattern, std::function<void(const T& file, const Event event_type)> callback, bool auto_init_files = false) :
 			_path(path),
 			_pattern(pattern),
 			_callback(callback),
+			_auto_init_files(auto_init_files),
 			_directory(get_directory(path))
 		{
 			init();
 		}
 
 #if defined _WIN32 && (defined UNICODE || defined _UNICODE)
-		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
-			FileWatch<T>(path, UnderpinningRegex(L".*"), callback) {}
+		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback, bool auto_init_files = false) :
+			FileWatch<T>(path, UnderpinningRegex(L".*"), callback, auto_init_files) {}
 #else // _WIN32 && (UNICODE || _UNICODE)
-		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
-			FileWatch<T>(path, UnderpinningRegex(".*"), callback) {}
+		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback, bool auto_init_files = false) :
+			FileWatch<T>(path, UnderpinningRegex(".*"), callback, auto_init_files) {}
 #endif
 
 		~FileWatch() {
@@ -108,7 +109,7 @@ namespace filewatch {
 
 		FileWatch(const FileWatch<T>& other) : FileWatch<T>(other._path, other._callback) {}
 
-		FileWatch<T>& operator=(const FileWatch<T>& other) 
+		FileWatch<T>& operator=(const FileWatch<T>& other)
 		{
 			if (this == &other) { return *this; }
 
@@ -132,8 +133,8 @@ namespace filewatch {
 			T filename;
 		};
 		const T _path;
-
 		UnderpinningRegex _pattern;
+		const bool _auto_init_files;
 
 		static constexpr std::size_t _buffer_size = { 1024 * 256 };
 
@@ -188,7 +189,7 @@ namespace filewatch {
 		const static std::size_t event_size = (sizeof(struct inotify_event));
 #endif // __unix__
 
-		void init() 
+		void init()
 		{
 #ifdef _WIN32
 			_close_event = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -199,17 +200,19 @@ namespace filewatch {
 			_callback_thread = std::move(std::thread([this]() {
 				try {
 					callback_thread();
-				} catch (...) {
+				}
+				catch (...) {
 					try {
 						_running.set_exception(std::current_exception());
 					}
 					catch (...) {} // set_exception() may throw too
 				}
 			}));
-			_watch_thread = std::move(std::thread([this]() { 
+			_watch_thread = std::move(std::thread([this]() {
 				try {
 					monitor_directory();
-				} catch (...) {
+				}
+				catch (...) {
 					try {
 						_running.set_exception(std::current_exception());
 					}
@@ -240,7 +243,37 @@ namespace filewatch {
 #endif // __unix__
 		}
 
-		const PathParts split_directory_and_file(const T& path) const 
+		const std::vector<UnderpinningString> get_all_files_under_path(const T& path)
+		{
+			std::vector<UnderpinningString> files;
+#ifdef _WIN32
+			HANDLE find_handle = INVALID_HANDLE_VALUE;
+
+			auto string_size = GetFullPathName(path.c_str(), 0, nullptr, nullptr);
+			UnderpinningString full_path;
+			full_path.resize(string_size);
+			GetFullPathName(path.c_str(), 0, &full_path[0], 0);
+
+			WIN32_FIND_DATA find_file_data;
+			find_handle = FindFirstFile((full_path + L"\\*").c_str(), &find_file_data);
+			if (find_handle == INVALID_HANDLE_VALUE)
+			{
+				throw std::system_error(GetLastError(), std::system_category());
+			}
+			do
+			{
+				if ((find_file_data.dwFileAttributes | FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY
+					&& (find_file_data.cFileName[0] != '.'))
+				{
+					files.push_back(find_file_data.cFileName);
+				}
+			} while (FindNextFile(find_handle, &find_file_data) != 0);
+			FindClose(find_handle);
+#elif __unix__
+#endif // __unix__
+		}
+
+		const PathParts split_directory_and_file(const T& path) const
 		{
 			const auto predict = [](typename T::value_type character) {
 #ifdef _WIN32
@@ -255,19 +288,19 @@ namespace filewatch {
 #elif __unix__
 			const UnderpinningString this_directory = "./";
 #endif // __unix__
-			
+
 			const auto pivot = std::find_if(path.rbegin(), path.rend(), predict).base();
 			//if the path is something like "test.txt" there will be no directoy part, however we still need one, so insert './'
 			const T directory = [&]() {
 				const auto extracted_directory = UnderpinningString(path.begin(), pivot);
 				return (extracted_directory.size() > 0) ? extracted_directory : this_directory;
-			}(); 
+			}();
 			const T filename = UnderpinningString(pivot, path.end());
 			return PathParts(directory, filename);
 		}
 
 		bool pass_filter(const UnderpinningString& file_path)
-		{ 
+		{
 			if (_watching_single_file) {
 				const UnderpinningString extracted_filename = { split_directory_and_file(file_path).filename };
 				//if we are watching a single file, only that file should trigger action
@@ -277,7 +310,7 @@ namespace filewatch {
 		}
 
 #ifdef _WIN32
-		HANDLE get_directory(const T& path) 
+		HANDLE get_directory(const T& path)
 		{
 			auto file_info = GetFileAttributes(path.c_str());
 
@@ -287,6 +320,20 @@ namespace filewatch {
 			}
 			_watching_single_file = (file_info & FILE_ATTRIBUTE_DIRECTORY) == false;
 
+			if (_watching_single_file == false && _auto_init_files) {
+				const auto files = get_all_files_under_path(path);
+				{
+					std::lock_guard<std::mutex> lock(_callback_mutex);
+					for (const auto& file : files)
+					{
+						if (std::regex_match(file, _pattern)) {
+							_callback_information.emplace_back(file, Event::modified);
+						}
+					}
+				}
+				_cv.notify_all();
+			}
+
 			const T watch_path = [this, &path]() {
 				if (_watching_single_file)
 				{
@@ -294,7 +341,7 @@ namespace filewatch {
 					_filename = parsed_path.filename;
 					return parsed_path.directory;
 				}
-				else 
+				else
 				{
 					return path;
 				}
@@ -315,7 +362,7 @@ namespace filewatch {
 			}
 			return directory;
 		}
-		void monitor_directory() 
+		void monitor_directory()
 		{
 			std::vector<BYTE> buffer(_buffer_size);
 			DWORD bytes_returned = 0;
@@ -339,9 +386,9 @@ namespace filewatch {
 					_listen_filters,
 					&bytes_returned,
 					&overlapped_buffer, NULL);
-			
+
 				async_pending = true;
-			
+
 				switch (WaitForMultipleObjects(2, handles.data(), FALSE, INFINITE))
 				{
 				case WAIT_OBJECT_0:
@@ -407,10 +454,10 @@ namespace filewatch {
 			return S_ISREG(statbuf.st_mode);
 		}
 
-		FolderInfo get_directory(const T& path) 
+		FolderInfo get_directory(const T& path)
 		{
 			const auto folder = inotify_init();
-			if (folder < 0) 
+			if (folder < 0)
 			{
 				throw std::system_error(errno, std::system_category());
 			}
@@ -432,42 +479,42 @@ namespace filewatch {
 			}();
 
 			const auto watch = inotify_add_watch(folder, watch_path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
-			if (watch < 0) 
+			if (watch < 0)
 			{
 				throw std::system_error(errno, std::system_category());
 			}
 			return { folder, watch };
 		}
 
-		void monitor_directory() 
+		void monitor_directory()
 		{
 			std::vector<char> buffer(_buffer_size);
 
 			_running.set_value();
-			while (_destory == false) 
+			while (_destory == false)
 			{
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
-				if (length > 0) 
+				if (length > 0)
 				{
 					int i = 0;
 					std::vector<std::pair<T, Event>> parsed_information;
-					while (i < length) 
+					while (i < length)
 					{
 						struct inotify_event *event = reinterpret_cast<struct inotify_event *>(&buffer[i]); // NOLINT
-						if (event->len) 
+						if (event->len)
 						{
 							const UnderpinningString changed_file{ event->name };
 							if (pass_filter(changed_file))
 							{
-								if (event->mask & IN_CREATE) 
+								if (event->mask & IN_CREATE)
 								{
 									parsed_information.emplace_back(T{ changed_file }, Event::added);
 								}
-								else if (event->mask & IN_DELETE) 
+								else if (event->mask & IN_DELETE)
 								{
 									parsed_information.emplace_back(T{ changed_file }, Event::removed);
 								}
-								else if (event->mask & IN_MODIFY) 
+								else if (event->mask & IN_MODIFY)
 								{
 									parsed_information.emplace_back(T{ changed_file }, Event::modified);
 								}
