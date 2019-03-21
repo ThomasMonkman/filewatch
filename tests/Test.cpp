@@ -149,7 +149,10 @@ TEST_CASE("regex", "[regex]") {
 
 TEST_CASE("init all files", "[auto_init]") {
 	const auto test_folder_path = testhelper::cross_platform_string("./");
-	const std::vector<test_string> test_files = { "1.test", "2.test" };
+	const std::vector<test_string> test_files = { 
+		testhelper::cross_platform_string("1.test"),
+		testhelper::cross_platform_string("2.test") 
+	};
 	
 	for (const auto& file : test_files) {
 		testhelper::create_and_modify_file(file);
