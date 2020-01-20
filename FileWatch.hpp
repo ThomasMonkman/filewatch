@@ -250,7 +250,9 @@ namespace filewatch {
 #endif // __unix__
 			};
 #ifdef _WIN32
+#ifndef _UNICODE
 #define _UNICODE
+#endif // !_UNICODE
 			const UnderpinningString this_directory = _T("./");
 #elif __unix__
 			const UnderpinningString this_directory = "./";
@@ -334,7 +336,7 @@ namespace filewatch {
 				std::vector<std::pair<T, Event>> parsed_information;
 				ReadDirectoryChangesW(
 					_directory,
-					buffer.data(), buffer.size(),
+					buffer.data(), static_cast<DWORD>(buffer.size()),
 					TRUE,
 					_listen_filters,
 					&bytes_returned,
