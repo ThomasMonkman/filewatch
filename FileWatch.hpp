@@ -59,6 +59,7 @@
 #include <type_traits>
 #include <future>
 #include <regex>
+#include <iostream>
 
 namespace filewatch {
 	enum class Event {
@@ -94,13 +95,8 @@ namespace filewatch {
 			init();
 		}
 
-#if defined _WIN32 && (defined UNICODE || defined _UNICODE)
 		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
-			FileWatch<T>(path, UnderpinningRegex(L".*"), callback) {}
-#else // _WIN32 && (UNICODE || _UNICODE)
-		FileWatch(T path, std::function<void(const T& file, const Event event_type)> callback) :
-			FileWatch<T>(path, UnderpinningRegex(".*"), callback) {}
-#endif
+			FileWatch<T>(path, UnderpinningRegex(_regex_all), callback) {}
 
 		~FileWatch() {
 			destroy();
@@ -125,6 +121,9 @@ namespace filewatch {
 		FileWatch<T>& operator=(FileWatch<T>&&) & = delete;
 
 	private:
+        static constexpr typename T::value_type _regex_all[] = { '.', '*', '\0' };
+        static constexpr typename T::value_type _this_directory[] = { '.', '/', '\0' };
+
 		struct PathParts
 		{
 			PathParts(T directory, T filename) : directory(directory), filename(filename) {}
@@ -244,27 +243,20 @@ namespace filewatch {
 		{
 			const auto predict = [](typename T::value_type character) {
 #ifdef _WIN32
-				return character == _T('\\') || character == _T('/');
+                return character == T::value_type('\\') || character == T::value_type('/');
 #elif __unix__
-				return character == '/';
+                return character == T::value_type('/');
 #endif // __unix__
 			};
-#ifdef _WIN32
-#ifndef _UNICODE
-#define _UNICODE
-#endif // !_UNICODE
-			const UnderpinningString this_directory = _T("./");
-#elif __unix__
-			const UnderpinningString this_directory = "./";
-#endif // __unix__
-			
-			const auto pivot = std::find_if(path.rbegin(), path.rend(), predict).base();
-			//if the path is something like "test.txt" there will be no directoy part, however we still need one, so insert './'
+
+            UnderpinningString path_string = path;
+            const auto pivot = std::find_if(path_string.rbegin(), path_string.rend(), predict).base();
+			//if the path is something like "test.txt" there will be no directory part, however we still need one, so insert './'
 			const T directory = [&]() {
-				const auto extracted_directory = UnderpinningString(path.begin(), pivot);
-				return (extracted_directory.size() > 0) ? extracted_directory : this_directory;
+                const auto extracted_directory = UnderpinningString(path_string.begin(), pivot);
+                return (extracted_directory.size() > 0) ? extracted_directory : UnderpinningString(_this_directory);
 			}(); 
-			const T filename = UnderpinningString(pivot, path.end());
+			const T filename = UnderpinningString(pivot, path_string.end());
 			return PathParts(directory, filename);
 		}
 
@@ -279,9 +271,23 @@ namespace filewatch {
 		}
 
 #ifdef _WIN32
+        template<typename... Args> DWORD GetFileAttributesX(const char* lpFileName, Args... args) {
+            return GetFileAttributesA(lpFileName, args...);
+        }
+        template<typename... Args> DWORD GetFileAttributesX(const wchar_t* lpFileName, Args... args) {
+            return GetFileAttributesW(lpFileName, args...);
+        }
+
+        template<typename... Args> HANDLE CreateFileX(const char* lpFileName, Args... args) {
+            return CreateFileA(lpFileName, args...);
+        }
+        template<typename... Args> HANDLE CreateFileX(const wchar_t* lpFileName, Args... args) {
+            return CreateFileW(lpFileName, args...);
+        }
+
 		HANDLE get_directory(const T& path) 
 		{
-			auto file_info = GetFileAttributes(path.c_str());
+			auto file_info = GetFileAttributesX(path.c_str());
 
 			if (file_info == INVALID_FILE_ATTRIBUTES)
 			{
@@ -302,14 +308,14 @@ namespace filewatch {
 				}
 			}();
 
-			HANDLE directory = ::CreateFile(
+			HANDLE directory = CreateFileX(
 				watch_path.c_str(),           // pointer to the file name
 				FILE_LIST_DIRECTORY,    // access (read/write) mode
 				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, // share mode
-				NULL, // security descriptor
+				nullptr, // security descriptor
 				OPEN_EXISTING,         // how to create
 				FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, // file attributes
-				NULL);                 // file with attributes to copy
+				HANDLE(0));                 // file with attributes to copy
 
 			if (directory == INVALID_HANDLE_VALUE)
 			{
@@ -317,6 +323,19 @@ namespace filewatch {
 			}
 			return directory;
 		}
+
+        void convert_wstring(const std::wstring& wstr, std::string& out)
+        {
+            int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+            out.resize(size_needed, '\0');
+            WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &out[0], size_needed, NULL, NULL);
+        }
+
+        void convert_wstring(const std::wstring& wstr, std::wstring& out)
+        {
+            out = wstr;
+        }
+
 		void monitor_directory() 
 		{
 			std::vector<BYTE> buffer(_buffer_size);
@@ -360,7 +379,9 @@ namespace filewatch {
 					FILE_NOTIFY_INFORMATION *file_information = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(&buffer[0]);
 					do
 					{
-						UnderpinningString changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
+						std::wstring changed_file_w{ file_information->FileName, file_information->FileNameLength / sizeof(file_information->FileName[0]) };
+                        UnderpinningString changed_file;
+                        convert_wstring(changed_file_w, changed_file);
 						if (pass_filter(changed_file))
 						{
 							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
