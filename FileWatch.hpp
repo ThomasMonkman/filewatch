@@ -81,8 +81,9 @@ namespace filewatch {
 	template<class T>
 	class FileWatch
 	{
-		typedef std::basic_string<typename T::value_type, std::char_traits<typename T::value_type>> UnderpinningString;
-		typedef std::basic_regex<typename T::value_type, std::regex_traits<typename T::value_type>> UnderpinningRegex;
+		typedef typename T::value_type C;
+		typedef std::basic_string<C, std::char_traits<C>> UnderpinningString;
+		typedef std::basic_regex<C, std::regex_traits<C>> UnderpinningRegex;
 
 	public:
 
@@ -121,8 +122,8 @@ namespace filewatch {
 		FileWatch<T>& operator=(FileWatch<T>&&) & = delete;
 
 	private:
-		static constexpr typename T::value_type _regex_all[] = { '.', '*', '\0' };
-		static constexpr typename T::value_type _this_directory[] = { '.', '/', '\0' };
+		static constexpr C _regex_all[] = { '.', '*', '\0' };
+		static constexpr C _this_directory[] = { '.', '/', '\0' };
 
 		struct PathParts
 		{
@@ -241,11 +242,11 @@ namespace filewatch {
 
 		const PathParts split_directory_and_file(const T& path) const 
 		{
-			const auto predict = [](typename T::value_type character) {
+			const auto predict = [](C character) {
 #ifdef _WIN32
-				return character == T::value_type('\\') || character == T::value_type('/');
+				return character == C('\\') || character == C('/');
 #elif __unix__
-				return character == T::value_type('/');
+				return character == C('/');
 #endif // __unix__
 			};
 
@@ -255,7 +256,7 @@ namespace filewatch {
 			const T directory = [&]() {
 				const auto extracted_directory = UnderpinningString(path_string.begin(), pivot);
 				return (extracted_directory.size() > 0) ? extracted_directory : UnderpinningString(_this_directory);
-			}(); 
+			}();
 			const T filename = UnderpinningString(pivot, path_string.end());
 			return PathParts(directory, filename);
 		}
@@ -534,5 +535,8 @@ namespace filewatch {
 			}
 		}
 	};
+
+	template<class T> constexpr typename FileWatch<T>::C FileWatch<T>::_regex_all[];
+	template<class T> constexpr typename FileWatch<T>::C FileWatch<T>::_this_directory[];
 }
 #endif
