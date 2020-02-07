@@ -121,8 +121,8 @@ namespace filewatch {
 		FileWatch<T>& operator=(FileWatch<T>&&) & = delete;
 
 	private:
-        static constexpr typename T::value_type _regex_all[] = { '.', '*', '\0' };
-        static constexpr typename T::value_type _this_directory[] = { '.', '/', '\0' };
+		static constexpr typename T::value_type _regex_all[] = { '.', '*', '\0' };
+		static constexpr typename T::value_type _this_directory[] = { '.', '/', '\0' };
 
 		struct PathParts
 		{
@@ -243,18 +243,18 @@ namespace filewatch {
 		{
 			const auto predict = [](typename T::value_type character) {
 #ifdef _WIN32
-                return character == T::value_type('\\') || character == T::value_type('/');
+				return character == T::value_type('\\') || character == T::value_type('/');
 #elif __unix__
-                return character == T::value_type('/');
+				return character == T::value_type('/');
 #endif // __unix__
 			};
 
-            UnderpinningString path_string = path;
-            const auto pivot = std::find_if(path_string.rbegin(), path_string.rend(), predict).base();
+			UnderpinningString path_string = path;
+			const auto pivot = std::find_if(path_string.rbegin(), path_string.rend(), predict).base();
 			//if the path is something like "test.txt" there will be no directory part, however we still need one, so insert './'
 			const T directory = [&]() {
-                const auto extracted_directory = UnderpinningString(path_string.begin(), pivot);
-                return (extracted_directory.size() > 0) ? extracted_directory : UnderpinningString(_this_directory);
+				const auto extracted_directory = UnderpinningString(path_string.begin(), pivot);
+				return (extracted_directory.size() > 0) ? extracted_directory : UnderpinningString(_this_directory);
 			}(); 
 			const T filename = UnderpinningString(pivot, path_string.end());
 			return PathParts(directory, filename);
@@ -271,19 +271,19 @@ namespace filewatch {
 		}
 
 #ifdef _WIN32
-        template<typename... Args> DWORD GetFileAttributesX(const char* lpFileName, Args... args) {
-            return GetFileAttributesA(lpFileName, args...);
-        }
-        template<typename... Args> DWORD GetFileAttributesX(const wchar_t* lpFileName, Args... args) {
-            return GetFileAttributesW(lpFileName, args...);
-        }
+		template<typename... Args> DWORD GetFileAttributesX(const char* lpFileName, Args... args) {
+			return GetFileAttributesA(lpFileName, args...);
+		}
+		template<typename... Args> DWORD GetFileAttributesX(const wchar_t* lpFileName, Args... args) {
+			return GetFileAttributesW(lpFileName, args...);
+		}
 
-        template<typename... Args> HANDLE CreateFileX(const char* lpFileName, Args... args) {
-            return CreateFileA(lpFileName, args...);
-        }
-        template<typename... Args> HANDLE CreateFileX(const wchar_t* lpFileName, Args... args) {
-            return CreateFileW(lpFileName, args...);
-        }
+		template<typename... Args> HANDLE CreateFileX(const char* lpFileName, Args... args) {
+			return CreateFileA(lpFileName, args...);
+		}
+		template<typename... Args> HANDLE CreateFileX(const wchar_t* lpFileName, Args... args) {
+			return CreateFileW(lpFileName, args...);
+		}
 
 		HANDLE get_directory(const T& path) 
 		{
@@ -324,17 +324,17 @@ namespace filewatch {
 			return directory;
 		}
 
-        void convert_wstring(const std::wstring& wstr, std::string& out)
-        {
-            int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
-            out.resize(size_needed, '\0');
-            WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &out[0], size_needed, NULL, NULL);
-        }
+		void convert_wstring(const std::wstring& wstr, std::string& out)
+		{
+			int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+			out.resize(size_needed, '\0');
+			WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &out[0], size_needed, NULL, NULL);
+		}
 
-        void convert_wstring(const std::wstring& wstr, std::wstring& out)
-        {
-            out = wstr;
-        }
+		void convert_wstring(const std::wstring& wstr, std::wstring& out)
+		{
+			out = wstr;
+		}
 
 		void monitor_directory() 
 		{
@@ -380,8 +380,8 @@ namespace filewatch {
 					do
 					{
 						std::wstring changed_file_w{ file_information->FileName, file_information->FileNameLength / sizeof(file_information->FileName[0]) };
-                        UnderpinningString changed_file;
-                        convert_wstring(changed_file_w, changed_file);
+						UnderpinningString changed_file;
+						convert_wstring(changed_file_w, changed_file);
 						if (pass_filter(changed_file))
 						{
 							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
