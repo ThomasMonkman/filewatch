@@ -183,7 +183,7 @@ namespace filewatch {
 
 		FolderInfo  _directory;
 
-		const std::uint32_t _listen_filters = IN_MODIFY | IN_CREATE | IN_DELETE;
+		const std::uint32_t _listen_filters = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB;
 
 		const static std::size_t event_size = (sizeof(struct inotify_event));
 #endif // __unix__
@@ -471,6 +471,11 @@ namespace filewatch {
 								}
 								else if (event->mask & IN_MODIFY) 
 								{
+									parsed_information.emplace_back(T{ changed_file }, Event::modified);
+								}
+								else if (event->mask & IN_ATTRIB) 
+								{
+									// touch, for example, only generates ATTRIB, not MODIFY
 									parsed_information.emplace_back(T{ changed_file }, Event::modified);
 								}
 							}
