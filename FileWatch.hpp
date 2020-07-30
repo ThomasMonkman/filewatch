@@ -25,12 +25,14 @@
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif // NOMINMAX
+#define _UNICODE
 #include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <tchar.h>
-#include <Pathcch.h>
 #include <shlwapi.h>
 #endif // WIN32
 
@@ -281,7 +283,11 @@ namespace filewatch {
 #ifdef _WIN32
 		HANDLE get_directory(const T& path) 
 		{
+#if defined(UNICODE) || defined(_UNICODE)
+			auto file_info = GetFileAttributesW(path.c_str());
+#else
 			auto file_info = GetFileAttributes(path.c_str());
+#endif
 
 			if (file_info == INVALID_FILE_ATTRIBUTES)
 			{
@@ -302,7 +308,11 @@ namespace filewatch {
 				}
 			}();
 
+#if defined(UNICODE) || defined(_UNICODE)
+			HANDLE directory = ::CreateFileW(
+#else
 			HANDLE directory = ::CreateFile(
+#endif
 				watch_path.c_str(),           // pointer to the file name
 				FILE_LIST_DIRECTORY,    // access (read/write) mode
 				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, // share mode
@@ -321,7 +331,7 @@ namespace filewatch {
 		{
 			std::vector<BYTE> buffer(_buffer_size);
 			DWORD bytes_returned = 0;
-			OVERLAPPED overlapped_buffer{ 0 };
+			OVERLAPPED overlapped_buffer{ };
 
 			overlapped_buffer.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 			if (!overlapped_buffer.hEvent) {
