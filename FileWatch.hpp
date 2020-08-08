@@ -25,12 +25,14 @@
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif // NOMINMAX
+#define _UNICODE
 #include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <tchar.h>
-#include <Pathcch.h>
 #include <shlwapi.h>
 #endif // WIN32
 
@@ -88,9 +90,9 @@ namespace filewatch {
 		FileWatch(T path, UnderpinningRegex pattern, std::function<void(const T& file, const Event event_type)> callback) :
 			_path(path),
 			_pattern(pattern),
-			_callback(callback),
-			_directory(get_directory(path))
+			_callback(callback)
 		{
+			_directory = get_directory(path);
 			init();
 		}
 
@@ -183,7 +185,7 @@ namespace filewatch {
 
 		FolderInfo  _directory;
 
-		const std::uint32_t _listen_filters = IN_MODIFY | IN_CREATE | IN_DELETE;
+		const std::uint32_t _listen_filters = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB;
 
 		const static std::size_t event_size = (sizeof(struct inotify_event));
 #endif // __unix__
@@ -281,7 +283,11 @@ namespace filewatch {
 #ifdef _WIN32
 		HANDLE get_directory(const T& path) 
 		{
+#if defined(UNICODE) || defined(_UNICODE)
+			auto file_info = GetFileAttributesW(path.c_str());
+#else
 			auto file_info = GetFileAttributes(path.c_str());
+#endif
 
 			if (file_info == INVALID_FILE_ATTRIBUTES)
 			{
@@ -302,7 +308,11 @@ namespace filewatch {
 				}
 			}();
 
+#if defined(UNICODE) || defined(_UNICODE)
+			HANDLE directory = ::CreateFileW(
+#else
 			HANDLE directory = ::CreateFile(
+#endif
 				watch_path.c_str(),           // pointer to the file name
 				FILE_LIST_DIRECTORY,    // access (read/write) mode
 				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, // share mode
@@ -321,7 +331,7 @@ namespace filewatch {
 		{
 			std::vector<BYTE> buffer(_buffer_size);
 			DWORD bytes_returned = 0;
-			OVERLAPPED overlapped_buffer{ 0 };
+			OVERLAPPED overlapped_buffer{ };
 
 			overlapped_buffer.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 			if (!overlapped_buffer.hEvent) {
@@ -433,7 +443,7 @@ namespace filewatch {
 				}
 			}();
 
-			const auto watch = inotify_add_watch(folder, watch_path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
+			const auto watch = inotify_add_watch(folder, watch_path.c_str(), listen_filters);
 			if (watch < 0) 
 			{
 				throw std::system_error(errno, std::system_category());
@@ -471,6 +481,11 @@ namespace filewatch {
 								}
 								else if (event->mask & IN_MODIFY) 
 								{
+									parsed_information.emplace_back(T{ changed_file }, Event::modified);
+								}
+								else if (event->mask & IN_ATTRIB) 
+								{
+									// touch, for example, only generates ATTRIB, not MODIFY
 									parsed_information.emplace_back(T{ changed_file }, Event::modified);
 								}
 							}
