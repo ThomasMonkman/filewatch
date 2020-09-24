@@ -249,12 +249,9 @@ namespace filewatch {
 				return character == '/';
 #endif // __unix__
 			};
-#ifdef _WIN32
-#ifndef _UNICODE
-#define _UNICODE
-#endif // !_UNICODE
+#if defined _WIN32 && (defined UNICODE || defined _UNICODE)
 			const UnderpinningString this_directory = _T("./");
-#elif __unix__
+#else
 			const UnderpinningString this_directory = "./";
 #endif // __unix__
 			
@@ -279,6 +276,26 @@ namespace filewatch {
 		}
 
 #ifdef _WIN32
+		std::string from_utf16(const wchar_t* u16, int size, char)
+		{
+			std::string dst_path;
+
+			DWORD multi_buf_size = WideCharToMultiByte(CP_ACP, 0,
+				u16, size, 0, 0, 0, 0);
+
+			dst_path.resize(multi_buf_size);
+
+			multi_buf_size = WideCharToMultiByte(CP_ACP, 0,
+				u16, size, (LPSTR)dst_path.data(), multi_buf_size, 0, 0);
+
+			return dst_path;
+		}
+
+		std::wstring from_utf16(const wchar_t* u16, int size, wchar_t)
+		{
+			return std::wstring(u16, size);
+		}
+
 		HANDLE get_directory(const T& path) 
 		{
 			auto file_info = GetFileAttributes(path.c_str());
@@ -360,7 +377,8 @@ namespace filewatch {
 					FILE_NOTIFY_INFORMATION *file_information = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(&buffer[0]);
 					do
 					{
-						UnderpinningString changed_file{ file_information->FileName, file_information->FileNameLength / 2 };
+						UnderpinningString changed_file{ from_utf16(file_information->FileName,
+							file_information->FileNameLength / 2, T::value_type()) };
 						if (pass_filter(changed_file))
 						{
 							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
@@ -433,7 +451,7 @@ namespace filewatch {
 				}
 			}();
 
-			const auto watch = inotify_add_watch(folder, watch_path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
+			const auto watch = inotify_add_watch(folder, watch_path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE | IN_MOVE);
 			if (watch < 0) 
 			{
 				throw std::system_error(errno, std::system_category());
@@ -472,6 +490,14 @@ namespace filewatch {
 								else if (event->mask & IN_MODIFY) 
 								{
 									parsed_information.emplace_back(T{ changed_file }, Event::modified);
+								}
+								else if (event->mask & IN_MOVED_TO) 
+								{
+									parsed_information.emplace_back(T{ changed_file }, Event::renamed_new);
+								}
+								else if (event->mask & IN_MOVED_FROM) 
+								{
+									parsed_information.emplace_back(T{ changed_file }, Event::renamed_old);
 								}
 							}
 						}
