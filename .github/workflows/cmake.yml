@@ -100,12 +100,42 @@ jobs:
         - {
             name: "Ubuntu Latest", artifact: "Linux.7z",
             os: ubuntu-latest,
-            cc: "gcc-4.9", cxx: "g++-4.9"
+            cc: "clang-3.9", cxx: "clang++-3.9"
           }
         - {
             name: "Ubuntu Latest", artifact: "Linux.7z",
             os: ubuntu-latest,
-            cc: "clang-3.9", cxx: "clang++-3.9"
+            cc: "clang-4.0", cxx: "clang++-4.0"
+          }
+        - {
+            name: "Ubuntu Latest", artifact: "Linux.7z",
+            os: ubuntu-latest,
+            cc: "clang-5.0", cxx: "clang++-5.0"
+          }
+        - {
+            name: "Ubuntu Latest", artifact: "Linux.7z",
+            os: ubuntu-latest,
+            cc: "clang-6.0", cxx: "clang++-6.0"
+          }
+        - {
+            name: "Ubuntu Latest", artifact: "Linux.7z",
+            os: ubuntu-latest,
+            cc: "clang-7.0", cxx: "clang++-7.0"
+          }
+        - {
+            name: "Ubuntu Latest", artifact: "Linux.7z",
+            os: ubuntu-latest,
+            cc: "clang-8.0", cxx: "clang++-8.0"
+          }
+        - {
+            name: "Ubuntu Latest", artifact: "Linux.7z",
+            os: ubuntu-latest,
+            cc: "clang-9.0", cxx: "clang++-9.0"
+          }
+        - {
+            name: "Ubuntu Latest", artifact: "Linux.7z",
+            os: ubuntu-latest,
+            cc: "clang-10.0", cxx: "clang++-10.0"
           }
     steps:
     - uses: actions/checkout@v2
@@ -113,7 +143,6 @@ jobs:
     - name: Install Compiler
       shell: bash
       run:   |
-        sudo add-apt-repository http://dk.archive.ubuntu.com/ubuntu/ xenial universe
         sudo apt update
         sudo apt install ${{matrix.config.cc}} ${{matrix.config.cxx}}
 
