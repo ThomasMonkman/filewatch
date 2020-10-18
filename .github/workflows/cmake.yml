@@ -89,7 +89,7 @@ jobs:
       shell: bash
       run:   |
         sudo apt update
-        sudo apt install gcc-10 g++-10
+        sudo apt install ${{matrix.config.cc}} ${{matrix.config.cxx}}
 
     - name: Create Build Environment
       # Some projects don't allow in-source building, so create a separate build directory
@@ -105,6 +105,9 @@ jobs:
       # and build directories, but this is only available with CMake 3.13 and higher.  
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
       run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+      env:
+        CC:   ${{matrix.config.cc}}
+        CXX:  ${{matrix.config.cxx}}
 
     - name: Build
       working-directory: ${{runner.workspace}}/build
