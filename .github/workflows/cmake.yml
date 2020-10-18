@@ -64,7 +64,7 @@ jobs:
     name: ${{ matrix.config.name }} ${{ matrix.config.cxx }}
     runs-on: ${{ matrix.config.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         config:
         - {
@@ -113,7 +113,7 @@ jobs:
     - name: Install Compiler
       shell: bash
       run:   |
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo add-apt-repository http://dk.archive.ubuntu.com/ubuntu/ xenial universe
         sudo apt update
         sudo apt install ${{matrix.config.cc}} ${{matrix.config.cxx}}
 
