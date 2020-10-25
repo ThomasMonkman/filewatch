@@ -143,41 +143,41 @@ jobs:
       fail-fast: true
       matrix:
         config:
-        - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
-            clang-version: "4",
-          }
-        - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
-            clang-version: "5",
-          }
-        - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
-            clang-version: "6",
-          }
-        - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
-            clang-version: "7",
-          }
-        - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
-            clang-version: "8",
-          }
+        # - {
+        #     name: "Ubuntu Latest", artifact: "Linux.7z",
+        #     os: ubuntu-latest,
+        #     clang-version: "4",
+        #   }
+        # - {
+        #     name: "Ubuntu Latest", artifact: "Linux.7z",
+        #     os: ubuntu-latest,
+        #     clang-version: "5",
+        #   }
+        # - {
+        #     name: "Ubuntu Latest", artifact: "Linux.7z",
+        #     os: ubuntu-latest,
+        #     clang-version: "6",
+        #   }
+        # - {
+        #     name: "Ubuntu Latest", artifact: "Linux.7z",
+        #     os: ubuntu-latest,
+        #     clang-version: "7",
+        #   }
+        # - {
+        #     name: "Ubuntu Latest", artifact: "Linux.7z",
+        #     os: ubuntu-latest,
+        #     clang-version: "8",
+        #   }
         - {
             name: "Ubuntu Latest", artifact: "Linux.7z",
             os: ubuntu-latest,
             clang-version: "9",
           }
-        - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
-            clang-version: "10"
-          }
+        # - {
+        #     name: "Ubuntu Latest", artifact: "Linux.7z",
+        #     os: ubuntu-latest,
+        #     clang-version: "10"
+        #   }
     steps:
     - uses: actions/checkout@v2
 
