@@ -100,7 +100,7 @@ jobs:
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            cc: "g++-4.8", cxx: "g++-4.8"
+            cc: "gcc-4.8", cxx: "g++-4.8"
           }
     steps:
     - uses: actions/checkout@v2
