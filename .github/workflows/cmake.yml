@@ -140,7 +140,7 @@ jobs:
     name: ${{ matrix.config.name }} clang ${{ matrix.config.clang-version }}
     runs-on: ${{ matrix.config.os }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         config:
         # - {
@@ -148,11 +148,16 @@ jobs:
         #     os: ubuntu-18.04,
         #     clang-version: "4",
         #   }
-        # - {
-        #     name: "Ubuntu 18.04", artifact: "Linux.7z",
-        #     os: ubuntu-18.04,
-        #     clang-version: "5",
-        #   }
+        - {
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
+            clang-version: "5",
+          }
+        - {
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
+            clang-version: "5.0",
+          }
         # - {
         #     name: "Ubuntu 18.04", artifact: "Linux.7z",
         #     os: ubuntu-18.04,
