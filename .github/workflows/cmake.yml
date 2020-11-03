@@ -68,33 +68,33 @@ jobs:
       matrix:
         config:
         - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
             cc: "gcc-10", cxx: "g++-10"
           }
         - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
             cc: "gcc-9", cxx: "g++-9"
           }
         - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
             cc: "gcc-8", cxx: "g++-8"
           }
         - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
             cc: "gcc-7", cxx: "g++-7"
           }
         - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
             cc: "gcc-6", cxx: "g++-6"
           }
         - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
             cc: "gcc-5", cxx: "g++-5"
           }
     steps:
@@ -144,38 +144,38 @@ jobs:
       matrix:
         config:
         # - {
-        #     name: "Ubuntu Latest", artifact: "Linux.7z",
-        #     os: ubuntu-latest,
+        #     name: "Ubuntu 18.04", artifact: "Linux.7z",
+        #     os: ubuntu-18.04,
         #     clang-version: "4",
         #   }
         # - {
-        #     name: "Ubuntu Latest", artifact: "Linux.7z",
-        #     os: ubuntu-latest,
+        #     name: "Ubuntu 18.04", artifact: "Linux.7z",
+        #     os: ubuntu-18.04,
         #     clang-version: "5",
         #   }
         # - {
-        #     name: "Ubuntu Latest", artifact: "Linux.7z",
-        #     os: ubuntu-latest,
+        #     name: "Ubuntu 18.04", artifact: "Linux.7z",
+        #     os: ubuntu-18.04,
         #     clang-version: "6",
         #   }
         # - {
-        #     name: "Ubuntu Latest", artifact: "Linux.7z",
-        #     os: ubuntu-latest,
+        #     name: "Ubuntu 18.04", artifact: "Linux.7z",
+        #     os: ubuntu-18.04,
         #     clang-version: "7",
         #   }
         - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
             clang-version: "8",
           }
         - {
-            name: "Ubuntu Latest", artifact: "Linux.7z",
-            os: ubuntu-latest,
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
             clang-version: "9",
           }
         # - {
-        #     name: "Ubuntu Latest", artifact: "Linux.7z",
-        #     os: ubuntu-latest,
+        #     name: "Ubuntu 18.04", artifact: "Linux.7z",
+        #     os: ubuntu-18.04,
         #     clang-version: "10"
         #   }
     steps:
