@@ -146,11 +146,6 @@ jobs:
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            clang-version: "4",
-          }
-        - {
-            name: "Ubuntu 18.04", artifact: "Linux.7z",
-            os: ubuntu-18.04,
             clang-version: "4.0",
           }
         # - {
@@ -201,7 +196,7 @@ jobs:
       run:   |
         sudo apt-get update -y
         sudo apt-get install clang-${{matrix.config.clang-version}} -y
-    # sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-${{ matrix.config.clang-version }} 100
+        sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-${{ matrix.config.clang-version }} 100
     # - name: Install Compiler
     #   shell: bash
     #   run:   |
