@@ -11,9 +11,10 @@ Drop [FileWatch.hpp](https://github.com/ThomasMonkman/filewatch/blob/master/File
 #### Compiler Support:
 
 Works on:
-Clang 4 and higher
-GCC 4.8 and higher
-Visual Studio 2015 and higher should be supported, however only 2019 is on the ci and tested
+
+- Clang 4 and higher    
+- GCC 4.8 and higher    
+- Visual Studio 2015 and higher should be supported, however only 2019 is on the ci and tested
 
 #### Examples:
 - [Simple](#1)
