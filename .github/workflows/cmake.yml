@@ -143,16 +143,21 @@ jobs:
       fail-fast: false
       matrix:
         config:
-        # - {
-        #     name: "Ubuntu 18.04", artifact: "Linux.7z",
-        #     os: ubuntu-18.04,
-        #     clang-version: "4",
-        #   }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            clang-version: "5",
+            clang-version: "4",
           }
+        - {
+            name: "Ubuntu 18.04", artifact: "Linux.7z",
+            os: ubuntu-18.04,
+            clang-version: "4.0",
+          }
+        # - {
+        #     name: "Ubuntu 18.04", artifact: "Linux.7z",
+        #     os: ubuntu-18.04,
+        #     clang-version: "5",
+        #   }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
