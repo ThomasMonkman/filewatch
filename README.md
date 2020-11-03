@@ -2,12 +2,19 @@
 
 | Branch        | Status        |
 | ------------- |:-------------:|
-| **Master**    | [![Master](https://travis-ci.org/ThomasMonkman/filewatch.svg?branch=master)](https://travis-ci.org/ThomasMonkman/filewatch) |
-| **Develop**   | [![Develop](https://travis-ci.org/ThomasMonkman/filewatch.svg?branch=develop)](https://travis-ci.org/ThomasMonkman/filewatch) |
+| **Master**    | ![Master](https://github.com/ThomasMonkman/filewatch/workflows/CMake/badge.svg?branch=master) |
 
 Single header folder/file watcher in C++11 for windows and linux, with optional regex filtering
 #### Install:
 Drop [FileWatch.hpp](https://github.com/ThomasMonkman/filewatch/blob/master/FileWatch.hpp) in to your include path, and you should be good to go.
+
+#### Compiler Support:
+
+Works on:
+Clang 4 and higher
+GCC 4.8 and higher
+Visual Studio 2015 and higher should be supported, however only 2019 is on the ci and tested
+
 #### Examples:
 - [Simple](#1)
 - [Change Type](#2)
