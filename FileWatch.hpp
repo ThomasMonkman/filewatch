@@ -333,7 +333,7 @@ namespace filewatch {
 			}
 #endif // WIN32
 
-			_callback_thread = std::move(std::thread([this]() {
+			_callback_thread = std::thread([this]() {
 				try {
 					callback_thread();
 				} catch (...) {
@@ -342,9 +342,9 @@ namespace filewatch {
 					}
 					catch (...) {} // set_exception() may throw too
 				}
-			}));
+			});
 
-			_watch_thread = std::move(std::thread([this]() { 
+			_watch_thread = std::thread([this]() { 
 				try {
 					monitor_directory();
 				} catch (...) {
@@ -353,7 +353,7 @@ namespace filewatch {
 					}
 					catch (...) {} // set_exception() may throw too
 				}
-			}));
+			});
 
 			std::future<void> future = _running.get_future();
 			future.get(); //block until the monitor_directory is up and running
@@ -588,7 +588,6 @@ namespace filewatch {
 			{
 				throw std::system_error(errno, std::system_category());
 			}
-			const auto listen_filters = _listen_filters;
 
 			_watching_single_file = is_file(path);
 
@@ -661,7 +660,7 @@ namespace filewatch {
 #endif // __unix__
 
 #if FILEWATCH_PLATFORM_MAC
-            static StringType absolute_path_of(StringType path) {
+            static StringType absolute_path_of(const StringType& path) {
                   char buf[PATH_MAX];
                   int fd = open((const char*)path.c_str(), O_RDONLY);
                   const char* str = buf;
@@ -695,23 +694,19 @@ namespace filewatch {
                   return StringType {buf};
             }
 #elif defined(__unix__)
-            static StringType absolute_path_of(StringType path) {
+            static StringType absolute_path_of(const StringType& path) {
                   char buf[PATH_MAX];
-                  char link[30];
                   const char* str = buf;
                   struct stat stat;
                   mbstate_t state;
 
-                  int fd = open((const char*)path.c_str(), O_RDONLY);
-
-                  snprintf(link, sizeof(link), "/proc/self/fd/%d", fd);
-                  ssize_t absPathSize = readlink(link, buf, sizeof(buf));
-
-                  fstat(fd, &stat);
-                  close(fd);
+                  realpath((const char*)path.c_str(), buf);
+                  ::stat((const char*)path.c_str(), &stat);
 
                   if (stat.st_mode & S_IFREG || stat.st_mode & S_IFLNK) {
-                        for (size_t i = absPathSize - 1; i >= 0; i--) {
+                        size_t len = strlen(buf);
+
+                        for (size_t i = len - 1; i >= 0; i--) {
                               if (buf[i] == '/') {
                                     buf[i] = '\0';
                                     break;
@@ -730,7 +725,7 @@ namespace filewatch {
                   return StringType {buf};
             }
 #elif _WIN32
-            static StringType absolute_path_of(StringType path) {
+            static StringType absolute_path_of(const StringType& path) {
                   constexpr size_t size = IsWChar<C>::value? MAX_PATH : 32767 * sizeof(wchar_t);
                   char buf[size];
 
