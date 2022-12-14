@@ -945,7 +945,7 @@ namespace filewatch {
                   PathParts pathPair = split_directory_and_file(absolutePath);
 
                   if (pathPair.directory.size() > 0 && pathPair.directory[pathPair.directory.size() - 1] == '/') {
-                              pathPair.directory.erase(pathPair.directory.size() - 1);
+                        pathPair.directory.erase(pathPair.directory.size() - 1);
                   }
 
                   if (pathPair.directory != _path || !std::regex_match(pathPair.filename, _pattern)) {
