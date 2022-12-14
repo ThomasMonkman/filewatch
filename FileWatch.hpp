@@ -23,6 +23,7 @@
 #ifndef FILEWATCHER_H
 #define FILEWATCHER_H
 
+#include <fstream>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -315,7 +316,11 @@ namespace filewatch {
             };
             std::unordered_map<StringType, FileState> _directory_snapshot{};
             bool _previous_event_is_rename = false;
+            CFRunLoopRef _run_loop = nullptr;
+            int _file_fd = -1;
+            struct timespec _last_modification_time = {};
             FSEventStreamRef _directory;
+            // fd for single file
 #endif // FILEWATCH_PLATFORM_MAC
 
 		void init() 
@@ -362,6 +367,10 @@ namespace filewatch {
 			SetEvent(_close_event);
 #elif __unix__
 			inotify_rm_watch(_directory.folder, _directory.watch);
+#elif FILEWATCH_PLATFORM_MAC
+                  if (_run_loop) {
+                        CFRunLoopStop(_run_loop);
+                  }
 #endif // __unix__
 
 			_cv.notify_all();
@@ -653,10 +662,27 @@ namespace filewatch {
 #if FILEWATCH_PLATFORM_MAC || __unix__
             static StringType absolute_path_of(StringType path) {
                   char buf[PATH_MAX];
+                  int fd = open((const char*)path.c_str(), O_RDONLY);
                   const char* str = buf;
+                  struct stat stat;
                   mbstate_t state;
 
-                  realpath(path.c_str(), buf);
+                  assert(fd != -1);
+                  fcntl(fd, F_GETPATH, buf);
+                  fstat(fd, &stat);
+
+                  if (stat.st_mode & S_IFREG || stat.st_mode & S_IFLNK) {
+                        size_t len = strlen(buf);
+                        size_t i = len - 1;
+
+                        for (; i >= 0; i--) {
+                              if (buf[i] == '/') {
+                                    break;
+                              }
+                        }
+                        buf[i] = '\0';
+                  }
+                  close(fd);
 
                   if (IsWChar<C>::value) {
                         size_t needed = mbsrtowcs(nullptr, &str, 0, &state) + 1;
@@ -891,21 +917,21 @@ namespace filewatch {
                               std::move(entry.second.invalidate_and_clone())));
                   }
 
-                  walkDirectory(_path, [&](StringType path) {
-                        if (isParentOrSelfDirectory(path) || !std::regex_match(path, _pattern)) {
+                  walkDirectory(_path, [&](StringType file) {
+                        if (isParentOrSelfDirectory(file) || !std::regex_match(file, _pattern)) {
                               return;
                         }
-                        if (newSnapshot.count(path) == 0) {
-                              FileState state = makeFileState(path);
+                        if (newSnapshot.count(file) == 0) {
+                              FileState state = makeFileState(file);
                               struct stat stat;
                               
                               fstat(state.fd, &stat);
                               events.push_back(EventInfo {
                                     .event = Event::added,
-                                    .file = path,
+                                    .file = file,
                                     .time = stat.st_mtimespec
                               });
-                              newSnapshot.insert(std::make_pair(path, std::move(state)));
+                              newSnapshot.insert(std::make_pair(file, std::move(state)));
                         }
                   });
 
@@ -923,6 +949,66 @@ namespace filewatch {
                         
                         for (const auto& event : events) {
                               _callback_information.push_back(std::make_pair(event.file, event.event));
+                        }
+                  }
+                  _cv.notify_all();
+            }
+
+            void seeSingleFileChanges() {
+                  struct EventInfo {
+                        StringType file;
+                        Event event;
+                  };
+
+                  int eventCount = 1;
+                  EventInfo eventInfos[2];
+
+                  if (fdIsRemoved(_file_fd)) {
+                        eventInfos[0].event = Event::removed;
+                        eventInfos[0].file = _filename;
+                  }
+                  else {
+                        StringType absPath = pathOfFd(_file_fd);
+                        PathParts split = split_directory_and_file(absPath);
+
+                        if (split.directory != _path) {
+                              eventInfos[0].event = Event::removed;
+                              eventInfos[0].file = _filename;
+                        }
+                        else if (split.filename != _filename) {
+                              eventInfos[0].event = Event::renamed_old;
+                              eventInfos[0].file = std::move(_filename);
+                              eventInfos[1].event = Event::renamed_new;
+                              eventInfos[1].file = split.filename;
+                              eventCount = 2;
+                              _filename = std::move(split.filename);
+                        }
+                        else {
+                              struct stat stat;
+
+                              fstat(_file_fd, &stat);
+
+                              if (stat.st_mtimespec.tv_sec > _last_modification_time.tv_sec) {
+                                    eventInfos[0].event = Event::modified;
+                                    eventInfos[0].file = _filename;
+                                    _last_modification_time = stat.st_mtimespec;
+                              }
+                              else if (stat.st_mtimespec.tv_nsec > _last_modification_time.tv_nsec) {
+                                    eventInfos[0].event = Event::modified;
+                                    eventInfos[0].file = _filename;
+                                    _last_modification_time = stat.st_mtimespec;
+                              }
+                              else {
+                                    return;
+                              }
+                        }
+                  }
+
+                  {
+                        std::lock_guard<std::mutex> lock(_callback_mutex);
+                        for (int i = 0; i < eventCount; i++) {
+                              _callback_information.push_back(
+                                    std::make_pair(eventInfos[i].file, eventInfos[i].event));
                         }
                   }
                   _cv.notify_all();
@@ -954,6 +1040,9 @@ namespace filewatch {
                         pathPair.directory.erase(pathPair.directory.size() - 1);
                   }
 
+                  if (_watching_single_file && pathPair.filename != _filename) {
+                        return;
+                  }
                   if (pathPair.directory != _path || !std::regex_match(pathPair.filename, _pattern)) {
                         return;
                   }
@@ -992,7 +1081,7 @@ namespace filewatch {
 
                   {
                         std::lock_guard<std::mutex> lock(_callback_mutex);
-                        _callback_information.push_back(std::make_pair(std::move(absolutePath), event));
+                        _callback_information.push_back(std::make_pair(std::move(pathPair.filename), event));
                   }
                   _cv.notify_all();
             }
@@ -1009,8 +1098,11 @@ namespace filewatch {
                         FSEventStreamEventFlags flag = eventFlags[i];
                         CFStringRef path = (CFStringRef)CFArrayGetValueAtIndex(eventPaths, i);
 
-                        if (flag & kFSEventStreamEventFlagMustScanSubDirs) {
-                              self->walkAndSeeChanges();
+                        if (self->_watching_single_file) {
+                              self->seeSingleFileChanges();
+                        }
+                        else if (flag & kFSEventStreamEventFlagMustScanSubDirs) {
+                                    self->walkAndSeeChanges();
                         }
                         else {
                               self->notify(path, flag);
@@ -1018,7 +1110,7 @@ namespace filewatch {
                   }
             }
 
-            FSEventStreamRef get_directory(const StringType& directory) {
+            FSEventStreamRef openStream(const StringType& directory) {
                   CFStringEncoding encoding = IsWChar<C>::value? 
                         kCFStringEncodingUTF32 : kCFStringEncodingASCII;
                   CFStringRef path = CFStringCreateWithBytes(kCFAllocatorDefault, 
@@ -1044,20 +1136,46 @@ namespace filewatch {
                                     kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagFileEvents | 
                                     kFSEventStreamCreateFlagUseCFTypes);
 
-                  walkDirectory(_path, [this] (StringType path) mutable {
-                        if (!isParentOrSelfDirectory(path) && std::regex_match(path, _pattern)) {
-                              _directory_snapshot.insert(std::make_pair(std::move(path), 
-                                                std::move(makeFileState(path))));
-                        }
-                  });
                   CFRelease(path);
                   CFRelease(paths);
                   return event;
             }
 
+            FSEventStreamRef openStreamForDirectory(const StringType& directory) {
+                  FSEventStreamRef stream = openStream(directory);
+                  walkDirectory(directory, [this] (StringType path) mutable {
+                        if (!isParentOrSelfDirectory(path) && std::regex_match(path, _pattern)) {
+                              _directory_snapshot.insert(std::make_pair(std::move(path), 
+                                                std::move(makeFileState(path))));
+                        }
+                  });
+                  return stream;
+            }
+
+            FSEventStreamRef openStreamForFile(const StringType& file) {
+                  PathParts split = split_directory_and_file(file);
+
+                  _watching_single_file = true;
+                  _filename = std::move(split.filename);
+                  _file_fd = openFile(file);
+                  return openStreamForDirectory(split.directory);
+            }
+
+            FSEventStreamRef get_directory(const StringType& directory) {
+                  struct stat stat;
+
+                  ::stat((const char*)directory.c_str(), &stat);
+                  if (stat.st_mode & S_IFDIR) {
+                        return openStreamForDirectory(directory);
+                  }
+                  _last_modification_time = stat.st_mtimespec;
+                  return openStreamForFile(directory);
+            }
+
             void monitor_directory() {
+                  _run_loop = CFRunLoopGetCurrent();
                   FSEventStreamScheduleWithRunLoop(_directory, 
-                        CFRunLoopGetCurrent(), 
+                        _run_loop, 
                         kCFRunLoopDefaultMode);
                   FSEventStreamStart(_directory);
                   _running.set_value();

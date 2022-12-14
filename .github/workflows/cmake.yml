@@ -231,7 +231,7 @@ jobs:
               cc: "clang", cxx: "clang++"
             }
           - {
-              name: MacOS 11", artifact: "macos.7z",
+              name: MacOS 12", artifact: "macos.7z",
               os: macos-12,
               cc: "clang", cxx: "clang++"
             }

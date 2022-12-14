@@ -1,6 +1,7 @@
 #include <FileWatch.hpp>
 #include <iostream>
 #include <string>
+#include <iostream>
 
 int main() {
       filewatch::FileWatch<std::string> watch {
