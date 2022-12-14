@@ -23,6 +23,7 @@
 #ifndef FILEWATCHER_H
 #define FILEWATCHER_H
 
+#include <cstdio>
 #include <fstream>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -659,7 +660,7 @@ namespace filewatch {
 		}
 #endif // __unix__
 
-#if FILEWATCH_PLATFORM_MAC || __unix__
+#if FILEWATCH_PLATFORM_MAC
             static StringType absolute_path_of(StringType path) {
                   char buf[PATH_MAX];
                   int fd = open((const char*)path.c_str(), O_RDONLY);
@@ -673,16 +674,50 @@ namespace filewatch {
 
                   if (stat.st_mode & S_IFREG || stat.st_mode & S_IFLNK) {
                         size_t len = strlen(buf);
-                        size_t i = len - 1;
 
-                        for (; i >= 0; i--) {
+                        for (size_t i = len - 1; i >= 0; i--) {
                               if (buf[i] == '/') {
+                                    buf[i] = '\0';
                                     break;
                               }
                         }
-                        buf[i] = '\0';
                   }
                   close(fd);
+
+                  if (IsWChar<C>::value) {
+                        size_t needed = mbsrtowcs(nullptr, &str, 0, &state) + 1;
+                        StringType s;
+
+                        s.reserve(needed);
+                        mbsrtowcs((wchar_t*)&s[0], &str, s.size(), &state);
+                        return s;
+                  }
+                  return StringType {buf};
+            }
+#elif defined(__unix__)
+            static StringType absolute_path_of(StringType path) {
+                  char buf[PATH_MAX];
+                  char link[30];
+                  const char* str = buf;
+                  struct stat stat;
+                  mbstate_t state;
+
+                  int fd = open((const char*)path.c_str(), O_RDONLY);
+
+                  snprintf(link, sizeof(link), "/proc/self/fd/%d", fd);
+                  ssize_t absPathSize = readlink(link, buf, sizeof(buf));
+
+                  fstat(fd, &stat);
+                  close(fd);
+
+                  if (stat.st_mode & S_IFREG || stat.st_mode & S_IFLNK) {
+                        for (size_t i = absPathSize - 1; i >= 0; i--) {
+                              if (buf[i] == '/') {
+                                    buf[i] = '\0';
+                                    break;
+                              }
+                        }
+                  }
 
                   if (IsWChar<C>::value) {
                         size_t needed = mbsrtowcs(nullptr, &str, 0, &state) + 1;
@@ -840,6 +875,15 @@ namespace filewatch {
                   return strncmp(file.data(), path.data(), path.size()) == 0;
             }
 
+            PathParts splitPath(const StringType& path) {
+                  PathParts split = split_directory_and_file(path);
+
+                  if (split.directory.size() > 0 && split.directory[split.directory.size() - 1] == '/') {
+                              split.directory.erase(split.directory.size() - 1);
+                  }
+                  return split;
+            }
+
             StringType fullPathOf(const StringType& file) {
                   return _path + '/' + file;
             }
@@ -877,11 +921,7 @@ namespace filewatch {
                         }
 
                         StringType fullPath = fullPathOfFd(entry.second.fd);
-                        PathParts pathPair = split_directory_and_file(fullPath);
-
-                        if (pathPair.directory.size() > 0 && pathPair.directory[pathPair.directory.size() - 1] == '/') {
-                              pathPair.directory.erase(pathPair.directory.size() - 1);
-                        }
+                        PathParts pathPair = splitPath(fullPath);
 
                         if (pathPair.directory != _path) {
                               events.push_back(EventInfo {
@@ -969,7 +1009,7 @@ namespace filewatch {
                   }
                   else {
                         StringType absPath = pathOfFd(_file_fd);
-                        PathParts split = split_directory_and_file(absPath);
+                        PathParts split = splitPath(absPath);
 
                         if (split.directory != _path) {
                               eventInfos[0].event = Event::removed;
@@ -1034,11 +1074,7 @@ namespace filewatch {
                   buffer[written] = 0;
 
                   StringType absolutePath{(const C*)buffer, static_cast<size_t>(pathLength)};
-                  PathParts pathPair = split_directory_and_file(absolutePath);
-
-                  if (pathPair.directory.size() > 0 && pathPair.directory[pathPair.directory.size() - 1] == '/') {
-                        pathPair.directory.erase(pathPair.directory.size() - 1);
-                  }
+                  PathParts pathPair = splitPath(absolutePath);
 
                   if (_watching_single_file && pathPair.filename != _filename) {
                         return;
@@ -1153,7 +1189,7 @@ namespace filewatch {
             }
 
             FSEventStreamRef openStreamForFile(const StringType& file) {
-                  PathParts split = split_directory_and_file(file);
+                  PathParts split = splitPath(file);
 
                   _watching_single_file = true;
                   _filename = std::move(split.filename);
