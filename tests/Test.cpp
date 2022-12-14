@@ -8,7 +8,7 @@ using test_char = wchar_t*;
 using test_regex = std::wregex;
 #endif // _WIN32
 
-#if __unix__
+#if __unix__ || __APPLE__
 using test_string = std::string;
 using test_char = char*;
 using test_regex = std::regex;

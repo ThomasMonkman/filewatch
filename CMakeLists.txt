@@ -10,11 +10,18 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Weffc++")
+
 # Add debug flags
 if(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi /MP")
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+endif()
+
+if(APPLE)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -framework CoreServices")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 endif()
 
 # dial up the warnings
@@ -35,3 +42,5 @@ endif()
 if(BuildTests)
     add_subdirectory(tests)
 endif()
+
+add_subdirectory(example)
