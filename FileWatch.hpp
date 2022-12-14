@@ -43,8 +43,14 @@
 #include <sys/types.h>
 #include <sys/inotify.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <dirent.h>
 #include <unistd.h>
 #endif // __unix__
+
+#ifdef __linux__
+#include <linux/limits.h>
+#endif
 
 #if defined(__APPLE__) || defined(__MACH__)
 #include <CoreFoundation/CoreFoundation.h>
