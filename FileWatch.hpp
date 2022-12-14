@@ -674,13 +674,13 @@ namespace filewatch {
                   char buf[size];
 
                   DWORD length = IsWChar<C>::value? 
-                        GetFullPathNameA((LPCSTR)path.c_str(), 
-                              size / sizeof(TCHAR),
-                              buf,
-                              nullptr) : 
                         GetFullPathNameW((LPCWSTR)path.c_str(), 
                               size / sizeof(TCHAR),
                               (LPWSTR)buf,
+                              nullptr) : 
+                        GetFullPathNameA((LPCSTR)path.c_str(), 
+                              size / sizeof(TCHAR),
+                              buf,
                               nullptr);
                   return StringType{(C*)buf, length};
             }
