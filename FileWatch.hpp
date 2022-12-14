@@ -92,7 +92,7 @@ namespace filewatch {
 		renamed_new
 	};
       
-      template<typename T>
+      template<typename StringType>
       struct IsWChar {
             static constexpr bool value = false;
       };
@@ -420,7 +420,7 @@ namespace filewatch {
 			return CreateFileW(lpFileName, args...);
 		}
 
-		HANDLE get_directory(const T& path) 
+		HANDLE get_directory(const StringType& path) 
 		{
 			auto file_info = GetFileAttributesX(path.c_str());
 
@@ -430,7 +430,7 @@ namespace filewatch {
 			}
 			_watching_single_file = (file_info & FILE_ATTRIBUTE_DIRECTORY) == false;
 
-			const T watch_path = [this, &path]() {
+			const StringType watch_path = [this, &path]() {
 				if (_watching_single_file)
 				{
 					const auto parsed_path = split_directory_and_file(path);
@@ -487,7 +487,7 @@ namespace filewatch {
 			auto async_pending = false;
 			_running.set_value();
 			do {
-				std::vector<std::pair<T, Event>> parsed_information;
+				std::vector<std::pair<StringType, Event>> parsed_information;
 				ReadDirectoryChangesW(
 					_directory,
 					buffer.data(), static_cast<DWORD>(buffer.size()),
@@ -519,7 +519,7 @@ namespace filewatch {
 						convert_wstring(changed_file_w, changed_file);
 						if (pass_filter(changed_file))
 						{
-							parsed_information.emplace_back(T{ changed_file }, _event_type_mapping.at(file_information->Action));
+							parsed_information.emplace_back(StringType{ changed_file }, _event_type_mapping.at(file_information->Action));
 						}
 
 						if (file_information->NextEntryOffset == 0) {
@@ -555,7 +555,7 @@ namespace filewatch {
 
 #if __unix__
 
-		bool is_file(const T& path) const
+		bool is_file(const StringType& path) const
 		{
 			struct stat statbuf = {};
 			if (stat(path.c_str(), &statbuf) != 0)
@@ -565,7 +565,7 @@ namespace filewatch {
 			return S_ISREG(statbuf.st_mode);
 		}
 
-		FolderInfo get_directory(const T& path) 
+		FolderInfo get_directory(const StringType& path) 
 		{
 			const auto folder = inotify_init();
 			if (folder < 0) 
@@ -576,7 +576,7 @@ namespace filewatch {
 
 			_watching_single_file = is_file(path);
 
-			const T watch_path = [this, &path]() {
+			const StringType watch_path = [this, &path]() {
 				if (_watching_single_file)
 				{
 					const auto parsed_path = split_directory_and_file(path);
@@ -608,7 +608,7 @@ namespace filewatch {
 				if (length > 0) 
 				{
 					int i = 0;
-					std::vector<std::pair<T, Event>> parsed_information;
+					std::vector<std::pair<StringType, Event>> parsed_information;
 					while (i < length) 
 					{
 						struct inotify_event *event = reinterpret_cast<struct inotify_event *>(&buffer[i]); // NOLINT
@@ -619,15 +619,15 @@ namespace filewatch {
 							{
 								if (event->mask & IN_CREATE) 
 								{
-									parsed_information.emplace_back(T{ changed_file }, Event::added);
+									parsed_information.emplace_back(StringType{ changed_file }, Event::added);
 								}
 								else if (event->mask & IN_DELETE) 
 								{
-									parsed_information.emplace_back(T{ changed_file }, Event::removed);
+									parsed_information.emplace_back(StringType{ changed_file }, Event::removed);
 								}
 								else if (event->mask & IN_MODIFY) 
 								{
-									parsed_information.emplace_back(T{ changed_file }, Event::modified);
+									parsed_information.emplace_back(StringType{ changed_file }, Event::modified);
 								}
 							}
 						}
@@ -1085,7 +1085,7 @@ namespace filewatch {
 		}
 	};
 
-	template<class T> constexpr typename FileWatch<T>::C FileWatch<T>::_regex_all[];
-	template<class T> constexpr typename FileWatch<T>::C FileWatch<T>::_this_directory[];
+	template<class StringType> constexpr typename FileWatch<StringType>::C FileWatch<StringType>::_regex_all[];
+	template<class StringType> constexpr typename FileWatch<StringType>::C FileWatch<StringType>::_this_directory[];
 }
 #endif
