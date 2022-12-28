@@ -56,7 +56,7 @@ filewatch::FileWatch<std::wstring> watch(
 		case filewatch::Event::renamed_old:
 			std::cout << "The file was renamed and this is the old name." << '\n';
 			break;
-		case filewatch::ChangeType::renamed_new:
+		case filewatch::Event::renamed_new:
 			std::cout << "The file was renamed and this is the new name." << '\n';
 			break;
 		};
