@@ -208,7 +208,7 @@ namespace filewatch {
 			return *this;
 		}
 
-		// Const memeber varibles don't let me implent moves nicely, if moves are really wanted std::unique_ptr should be used and move that.
+		// Const member variables don't let me implement moves nicely, if moves are really wanted std::unique_ptr should be used and move that.
 		FileWatch<StringType>(FileWatch<StringType>&&) = delete;
 		FileWatch<StringType>& operator=(FileWatch<StringType>&&) & = delete;
 
@@ -233,17 +233,18 @@ namespace filewatch {
 
 		std::function<void(const StringType& file, const Event event_type)> _callback;
 
+#ifndef FILEWATCH_PLATFORM_MAC
 		std::thread _watch_thread;
 
 		std::condition_variable _cv;
 		std::mutex _callback_mutex;
 		std::vector<std::pair<StringType, Event>> _callback_information;
 		std::thread _callback_thread;
-
 		std::promise<void> _running;
-		std::atomic<bool> _destory = { false };
-		bool _watching_single_file = { false };
 
+		std::atomic<bool> _destory = { false };
+#endif
+		bool _watching_single_file = { false };
 #pragma mark "Platform specific data"
 #ifdef _WIN32
 		HANDLE _directory = { nullptr };
@@ -317,7 +318,7 @@ namespace filewatch {
             };
             std::unordered_map<StringType, FileState> _directory_snapshot{};
             bool _previous_event_is_rename = false;
-            CFRunLoopRef _run_loop = nullptr;
+            dispatch_queue_t _event_stream_queue;
             int _file_fd = -1;
             struct timespec _last_modification_time = {};
             FSEventStreamRef _directory;
@@ -332,7 +333,7 @@ namespace filewatch {
 				throw std::system_error(GetLastError(), std::system_category());
 			}
 #endif // WIN32
-
+#ifndef FILEWATCH_PLATFORM_MAC
 			_callback_thread = std::thread([this]() {
 				try {
 					callback_thread();
@@ -354,29 +355,30 @@ namespace filewatch {
 					catch (...) {} // set_exception() may throw too
 				}
 			});
-
 			std::future<void> future = _running.get_future();
 			future.get(); //block until the monitor_directory is up and running
+#else
+                  monitor_directory();
+#endif
 		}
 
 		void destroy()
 		{
+#ifndef FILEWATCH_PLATFORM_MAC
 			_destory = true;
 			_running = std::promise<void>();
-
+#endif
 #ifdef _WIN32
 			SetEvent(_close_event);
 #elif __unix__
 			inotify_rm_watch(_directory.folder, _directory.watch);
-#elif FILEWATCH_PLATFORM_MAC
-                  if (_run_loop) {
-                        CFRunLoopStop(_run_loop);
-                  }
 #endif // __unix__
 
+#ifndef FILEWATCH_PLATFORM_MAC
 			_cv.notify_all();
 			_watch_thread.join();
 			_callback_thread.join();
+#endif
 
 #ifdef _WIN32
 			CloseHandle(_directory);
@@ -386,7 +388,9 @@ namespace filewatch {
                   FSEventStreamStop(_directory);
                   FSEventStreamInvalidate(_directory);
                   FSEventStreamRelease(_directory);
+                  dispatch_release(_event_stream_queue);
                   _directory = nullptr;
+                  _event_stream_queue = nullptr;
 #endif // FILEWATCH_PLATFORM_MAC
 		}
 
@@ -674,7 +678,7 @@ namespace filewatch {
                   if (stat.st_mode & S_IFREG || stat.st_mode & S_IFLNK) {
                         size_t len = strlen(buf);
 
-                        for (size_t i = len - 1; i >= 0; i--) {
+                        for (ssize_t i = len - 1; i >= 0; i--) {
                               if (buf[i] == '/') {
                                     buf[i] = '\0';
                                     break;
@@ -740,7 +744,7 @@ namespace filewatch {
                               nullptr);
                   return StringType{(C*)buf, length};
             }
-#endif
+#endif // FILEWATCH_PLATFORM_MAC
 
 #if FILEWATCH_PLATFORM_MAC
             static StringType utf8StringToUtf32String(const char* buffer) {
@@ -874,7 +878,7 @@ namespace filewatch {
                   PathParts split = split_directory_and_file(path);
 
                   if (split.directory.size() > 0 && split.directory[split.directory.size() - 1] == '/') {
-                              split.directory.erase(split.directory.size() - 1);
+                        split.directory.erase(split.directory.size() - 1);
                   }
                   return split;
             }
@@ -978,15 +982,10 @@ namespace filewatch {
                         }
                         return a.time.tv_sec < b.time.tv_sec;
                   });
-
-                  {
-                        std::lock_guard<std::mutex> lock(_callback_mutex);
-                        
-                        for (const auto& event : events) {
-                              _callback_information.push_back(std::make_pair(event.file, event.event));
-                        }
+                  
+                  for (const auto& event : events) {
+                        _callback(event.file, event.event);
                   }
-                  _cv.notify_all();
             }
 
             void seeSingleFileChanges() {
@@ -1039,22 +1038,17 @@ namespace filewatch {
                         }
                   }
 
-                  {
-                        std::lock_guard<std::mutex> lock(_callback_mutex);
-                        for (int i = 0; i < eventCount; i++) {
-                              _callback_information.push_back(
-                                    std::make_pair(eventInfos[i].file, eventInfos[i].event));
-                        }
+                  for (int i = 0; i < eventCount; i++) {
+                        _callback(eventInfos[i].file, eventInfos[i].event);
                   }
-                  _cv.notify_all();
             }
 
-            void notify(CFStringRef path, const FSEventStreamEventFlags flags) {
-                  CFIndex pathLength = CFStringGetLength(path);
+            static StringType stringFromCFString(CFStringRef string) {
+                  CFIndex pathLength = CFStringGetLength(string);
                   CFIndex written = 0;
                   char buffer[PATH_MAX + 1];
 
-                  CFStringGetBytes(path, 
+                  CFStringGetBytes(string, 
                         CFRange {
                               .location = 0,
                               .length = pathLength,
@@ -1068,7 +1062,11 @@ namespace filewatch {
                   
                   buffer[written] = 0;
 
-                  StringType absolutePath{(const C*)buffer, static_cast<size_t>(pathLength)};
+                  return StringType{(const C*)buffer, static_cast<size_t>(pathLength)};
+            }
+
+            void notify(CFStringRef path, const FSEventStreamEventFlags flags) {
+                  StringType absolutePath = stringFromCFString(path);
                   PathParts pathPair = splitPath(absolutePath);
 
                   if (_watching_single_file && pathPair.filename != _filename) {
@@ -1110,11 +1108,7 @@ namespace filewatch {
                         event = Event::removed;
                   }
 
-                  {
-                        std::lock_guard<std::mutex> lock(_callback_mutex);
-                        _callback_information.push_back(std::make_pair(std::move(pathPair.filename), event));
-                  }
-                  _cv.notify_all();
+                  _callback(pathPair.filename, event);
             }
 
             static void handleFsEvent(__attribute__((unused)) ConstFSEventStreamRef streamFef, 
@@ -1129,11 +1123,15 @@ namespace filewatch {
                         FSEventStreamEventFlags flag = eventFlags[i];
                         CFStringRef path = (CFStringRef)CFArrayGetValueAtIndex(eventPaths, i);
 
-                        if (self->_watching_single_file) {
-                              self->seeSingleFileChanges();
-                        }
-                        else if (flag & kFSEventStreamEventFlagMustScanSubDirs) {
+                        if (flag & kFSEventStreamEventFlagMustScanSubDirs) {
+                              if (self->_watching_single_file) {
+                                    if (stringFromCFString(path) == self->_path) {
+                                          self->seeSingleFileChanges();
+                                    }
+                              }
+                              else {
                                     self->walkAndSeeChanges();
+                              }
                         }
                         else {
                               self->notify(path, flag);
@@ -1204,16 +1202,13 @@ namespace filewatch {
             }
 
             void monitor_directory() {
-                  _run_loop = CFRunLoopGetCurrent();
-                  FSEventStreamScheduleWithRunLoop(_directory, 
-                        _run_loop, 
-                        kCFRunLoopDefaultMode);
+                  _event_stream_queue = dispatch_queue_create("fswatch_event_queue", nullptr);
+                  FSEventStreamSetDispatchQueue(_directory, _event_stream_queue);
                   FSEventStreamStart(_directory);
-                  _running.set_value();
-                  CFRunLoopRun();
             }
 #endif // FILEWATCH_PLATFORM_MAC
 
+#ifndef FILEWATCH_PLATFORM_MAC
 		void callback_thread()
 		{
 			while (_destory == false) {
@@ -1238,6 +1233,7 @@ namespace filewatch {
 				}
 			}
 		}
+#endif // !FILEWATCH_PLATFORM_MAC
 	};
 
 	template<class StringType> constexpr typename FileWatch<StringType>::C FileWatch<StringType>::_regex_all[];
