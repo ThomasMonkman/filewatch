@@ -11,7 +11,7 @@ int main() {
             }
       };
 
-      while (true) {
+      while (!std::cin.peek()) {
 
       }
 }
