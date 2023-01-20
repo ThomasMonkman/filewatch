@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.1)
 project( FileWatch VERSION 0.0.1 LANGUAGES C CXX)
 
 option(BuildTests "Build the unit tests" ON)
+option(CompileExamples "Compile examples" OFF)
 enable_testing()
 
 # Enable c++11
@@ -41,4 +42,6 @@ if(BuildTests)
     add_subdirectory(tests)
 endif()
 
-# add_subdirectory(example)
+if(CompileExamples)
+      add_subdirectory(example)
+endif()
