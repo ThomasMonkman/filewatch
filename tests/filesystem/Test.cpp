@@ -14,11 +14,11 @@ using test_char = char*;
 using test_regex = std::regex;
 #endif // __unix__
 
-#include "catch/catch.hpp"
+#include <catch/catch.hpp>
 
-#include "../FileWatch.hpp"
+#include "../../FileWatch.hpp"
 
-#include "Util/TestHelper.hpp"
+#include "../Util/TestHelper.hpp"
 
 #include <future>
 #include <filesystem>
