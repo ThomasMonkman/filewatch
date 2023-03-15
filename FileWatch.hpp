@@ -738,7 +738,7 @@ namespace filewatch {
                               size / sizeof(TCHAR),
                               buf,
                               nullptr);
-                  return StringType{(C*)buf, length};
+                  return StringType{std::basic_string{(C*)buf, length}};
             }
 #endif
 
