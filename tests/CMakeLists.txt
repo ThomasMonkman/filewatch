@@ -1,6 +1,6 @@
 #include catch
 add_library(Catch INTERFACE)
-target_include_directories(Catch INTERFACE ${PROJECT_SOURCE_DIR}/tests/catch/catch.hpp)
+target_include_directories(Catch INTERFACE ${PROJECT_SOURCE_DIR}/tests/catch)
 
 if(FileWatch_Build_Tests)
     add_subdirectory(string)

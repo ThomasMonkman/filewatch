@@ -14,7 +14,7 @@ using test_char = char*;
 using test_regex = std::regex;
 #endif // __unix__
 
-#include <catch/catch.hpp>
+#include <catch.hpp>
 
 #include "../../FileWatch.hpp"
 
