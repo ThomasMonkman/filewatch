@@ -1,4 +1,6 @@
 #add tests
+set(CMAKE_CXX_STANDARD 17)
+
 set(FILEWATCH_UNIT_TEST_FILESYSTEM_TARGET_NAME "filewatch_unit_filesystem")
 add_executable(${FILEWATCH_UNIT_TEST_FILESYSTEM_TARGET_NAME}
 	${PROJECT_SOURCE_DIR}/tests/CatchMain.cpp
