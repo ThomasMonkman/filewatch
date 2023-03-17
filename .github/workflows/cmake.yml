@@ -66,37 +66,44 @@ jobs:
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            cc: "gcc-10", cxx: "g++-10"
+            cc: "gcc-10", cxx: "g++-10",
+            build-file-system: 'ON'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            cc: "gcc-9", cxx: "g++-9"
+            cc: "gcc-9", cxx: "g++-9",
+            build-file-system: 'ON'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            cc: "gcc-8", cxx: "g++-8"
+            cc: "gcc-8", cxx: "g++-8",
+            build-file-system: 'ON'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            cc: "gcc-7", cxx: "g++-7"
+            cc: "gcc-7", cxx: "g++-7",
+            build-file-system: 'OFF'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            cc: "gcc-6", cxx: "g++-6"
+            cc: "gcc-6", cxx: "g++-6",
+            build-file-system: 'OFF'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            cc: "gcc-5", cxx: "g++-5"
+            cc: "gcc-5", cxx: "g++-5",
+            build-file-system: 'OFF'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
-            cc: "gcc-4.8", cxx: "g++-4.8"
+            cc: "gcc-4.8", cxx: "g++-4.8",
+            build-file-system: 'OFF'
           }
     steps:
     - uses: actions/checkout@v2
@@ -120,7 +127,7 @@ jobs:
       # Note the current convention is to use the -S and -B options here to specify source 
       # and build directories, but this is only available with CMake 3.13 and higher.  
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DFileWatch_Build_Tests=ON
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DFileWatch_Build_Tests=ON -DFileWatch_Build_Tests_FileSystem=${{matrix.config.build-file-system}}
       env:
         CC:   ${{matrix.config.cc}}
         CXX:  ${{matrix.config.cxx}}
@@ -149,36 +156,43 @@ jobs:
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
             clang-version: "4.0",
+            build-file-system: 'OFF'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
             clang-version: "5.0",
+            build-file-system: 'OFF'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
             clang-version: "6.0",
+            build-file-system: 'OFF'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
             clang-version: "7",
+            build-file-system: 'OFF'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
             clang-version: "8",
+            build-file-system: 'ON'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
             clang-version: "9",
+            build-file-system: 'ON'
           }
         - {
             name: "Ubuntu 18.04", artifact: "Linux.7z",
             os: ubuntu-18.04,
             clang-version: "10",
+            build-file-system: 'ON'
           }
     steps:
     - uses: actions/checkout@v2
@@ -204,7 +218,7 @@ jobs:
       # Note the current convention is to use the -S and -B options here to specify source 
       # and build directories, but this is only available with CMake 3.13 and higher.  
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DFileWatch_Build_Tests=ON -DFileWatch_Build_Tests_FileSystem=${{matrix.config.build-file-system}}
     - name: Build
       working-directory: ${{runner.workspace}}/build
       shell: bash
@@ -228,12 +242,14 @@ jobs:
           - {
               name: "MacOS 11", artifact: "macos.7z",
               os: macos-11,
-              cc: "clang", cxx: "clang++"
+              cc: "clang", cxx: "clang++",
+              build-file-system: 'ON'
             }
           - {
               name: MacOS 12", artifact: "macos.7z",
               os: macos-12,
-              cc: "clang", cxx: "clang++"
+              cc: "clang", cxx: "clang++",
+              build-file-system: 'ON'
             }
       steps:
       - uses: actions/checkout@v2
@@ -251,7 +267,7 @@ jobs:
         # Note the current convention is to use the -S and -B options here to specify source 
         # and build directories, but this is only available with CMake 3.13 and higher.  
         # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
-        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DFileWatch_Build_Tests=ON -DFileWatch_Build_Tests_FileSystem=${{matrix.config.build-file-system}}
         env:
           CC:   ${{matrix.config.cc}}
           CXX:  ${{matrix.config.cxx}}
