@@ -718,7 +718,7 @@ namespace filewatch {
                         size_t needed = mbsrtowcs(nullptr, &str, 0, &state) + 1;
                         StringType s;
 
-                        s.reserve(needed);
+                        // s.reserve(needed);
                         mbsrtowcs((wchar_t*)&s[0], &str, s.size(), &state);
                         return s;
                   }
