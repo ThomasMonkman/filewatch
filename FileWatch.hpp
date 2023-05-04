@@ -604,7 +604,7 @@ namespace filewatch {
 				}
 			}();
 
-			const auto watch = inotify_add_watch(folder, watch_path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
+			const auto watch = inotify_add_watch(folder, watch_path.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE | IN_MOVED_TO);
 			if (watch < 0) 
 			{
 				throw std::system_error(errno, std::system_category());
@@ -620,27 +620,27 @@ namespace filewatch {
 			while (_destory == false) 
 			{
 				const auto length = read(_directory.folder, static_cast<void*>(buffer.data()), buffer.size());
-				if (length > 0) 
+				if (length > 0)
 				{
 					int i = 0;
 					std::vector<std::pair<StringType, Event>> parsed_information;
-					while (i < length) 
+					while (i < length)
 					{
 						struct inotify_event *event = reinterpret_cast<struct inotify_event *>(&buffer[i]); // NOLINT
-						if (event->len) 
+						if (event->len)
 						{
 							const UnderpinningString changed_file{ event->name };
 							if (pass_filter(changed_file))
 							{
-								if (event->mask & IN_CREATE) 
+								if (event->mask & IN_CREATE)
 								{
 									parsed_information.emplace_back(StringType{ changed_file }, Event::added);
 								}
-								else if (event->mask & IN_DELETE) 
+								else if (event->mask & IN_DELETE)
 								{
 									parsed_information.emplace_back(StringType{ changed_file }, Event::removed);
 								}
-								else if (event->mask & IN_MODIFY) 
+								else if (event->mask & IN_MODIFY || event->mask & IN_MOVED_TO)
 								{
 									parsed_information.emplace_back(StringType{ changed_file }, Event::modified);
 								}
