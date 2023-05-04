@@ -714,7 +714,7 @@ namespace filewatch {
                         }
                   }
 
-                  if (IsWChar<C>::value) {
+                  if constexpr (IsWChar<C>::value) {
                         size_t needed = mbsrtowcs(nullptr, &str, 0, &state) + 1;
                         StringType s;
 
