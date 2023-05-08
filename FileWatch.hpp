@@ -87,6 +87,10 @@
 #include <cstdlib>
 #include <iostream>
 
+#ifdef __cpp_lib_filesystem
+#include <filesystem>
+#endif
+
 #ifdef FILEWATCH_PLATFORM_MAC
 extern "C" int __getdirentries64(int, char *, int, long *);
 #endif // FILEWATCH_PLATFORM_MAC
@@ -659,6 +663,22 @@ namespace filewatch {
 		}
 #endif // __unix__
 
+            template<typename StringType>
+            struct absolute_path_of_helper {
+                  static StringType get(const char* buf) {
+                        return StringType{buf};
+                  }
+            };
+
+#ifdef __cpp_lib_filesystem
+            template<>
+            struct absolute_path_of_helper<std::filesystem::path> {
+                  static std::filesystem::path get(const char* buf) {
+                        return std::filesystem::u8path(buf);
+                  }
+            };
+#endif
+
 #if FILEWATCH_PLATFORM_MAC
             static StringType absolute_path_of(const StringType& path) {
                   char buf[PATH_MAX];
@@ -684,12 +704,11 @@ namespace filewatch {
                   close(fd);
 
                   if (IsWChar<C>::value) {
-                        size_t needed = mbsrtowcs(nullptr, &str, 0, &state) + 1;
-                        StringType s;
-
-                        s.reserve(needed);
-                        mbsrtowcs((wchar_t*)&s[0], &str, s.size(), &state);
-                        return s;
+                        std::mbstate_t state = std::mbstate_t();
+                        size_t needed = std::mbsrtowcs(nullptr, &str, 0, &state) + 1;
+                        std::wstring s(needed, L'\0');
+                        std::mbsrtowcs(&s[0], &str, s.size(), &state);
+                        return StringType {s};
                   }
                   return StringType {buf};
             }
@@ -715,12 +734,11 @@ namespace filewatch {
                   }
 
                   if (IsWChar<C>::value) {
-                        size_t needed = mbsrtowcs(nullptr, &str, 0, &state) + 1;
-                        StringType s;
-
-                        // s.reserve(needed);
-                        mbsrtowcs((wchar_t*)&s[0], &str, s.size(), &state);
-                        return s;
+                        std::mbstate_t state = std::mbstate_t();
+                        size_t needed = std::mbsrtowcs(nullptr, &str, 0, &state) + 1;
+                        std::wstring s(needed, L'\0');
+                        std::mbsrtowcs(&s[0], &str, s.size(), &state);
+                        return StringType {s};
                   }
                   return StringType {buf};
             }
