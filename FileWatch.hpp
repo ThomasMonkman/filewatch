@@ -731,11 +731,11 @@ namespace filewatch {
 
                   DWORD length = IsWChar<C>::value? 
                         GetFullPathNameW((LPCWSTR)path.c_str(), 
-                              size / sizeof(TCHAR),
+                              size / sizeof(WCHAR),
                               (LPWSTR)buf,
                               nullptr) : 
                         GetFullPathNameA((LPCSTR)path.c_str(), 
-                              size / sizeof(TCHAR),
+                              size,
                               buf,
                               nullptr);
                   return StringType{(C*)buf, length};
