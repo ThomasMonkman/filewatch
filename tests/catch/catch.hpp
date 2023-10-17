@@ -1367,8 +1367,11 @@ namespace Catch {
 }
 
 #ifdef CATCH_PLATFORM_MAC
-
+#if defined (__aarch64__)
+      #define CATCH_TRAP() __asm__("brk #0") /* NOLINT */
+#else
     #define CATCH_TRAP() __asm__("int $3\n" : : ) /* NOLINT */
+#endif // __aarch64__
 
 #elif defined(CATCH_PLATFORM_LINUX)
     // If we can use inline assembler, do it because this allows us to break
