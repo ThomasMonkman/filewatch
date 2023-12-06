@@ -244,7 +244,6 @@ namespace filewatch {
 		std::atomic<bool> _destory = { false };
 		bool _watching_single_file = { false };
 
-#pragma mark "Platform specific data"
 #ifdef _WIN32
 		HANDLE _directory = { nullptr };
 		HANDLE _close_event = { nullptr };
@@ -317,7 +316,7 @@ namespace filewatch {
             };
             std::unordered_map<StringType, FileState> _directory_snapshot{};
             bool _previous_event_is_rename = false;
-            CFRunLoopRef _run_loop = nullptr;
+            dispatch_queue_t _queue = nullptr;
             int _file_fd = -1;
             struct timespec _last_modification_time = {};
             FSEventStreamRef _directory;
@@ -368,10 +367,6 @@ namespace filewatch {
 			SetEvent(_close_event);
 #elif __unix__
 			inotify_rm_watch(_directory.folder, _directory.watch);
-#elif FILEWATCH_PLATFORM_MAC
-                  if (_run_loop) {
-                        CFRunLoopStop(_run_loop);
-                  }
 #endif // __unix__
 
 			_cv.notify_all();
@@ -387,6 +382,9 @@ namespace filewatch {
                   FSEventStreamInvalidate(_directory);
                   FSEventStreamRelease(_directory);
                   _directory = nullptr;
+                  if (_queue) {
+                  	dispatch_release(_queue);
+                  }
 #endif // FILEWATCH_PLATFORM_MAC
 		}
 
@@ -726,12 +724,12 @@ namespace filewatch {
             }
 #elif _WIN32
             static StringType absolute_path_of(const StringType& path) {
-                  constexpr size_t size = IsWChar<C>::value? MAX_PATH : 32767 * sizeof(wchar_t);
+                  constexpr size_t size = IsWChar<C>::value? MAX_PATH * sizeof(wchar_t) : 32767 * sizeof(wchar_t);
                   char buf[size];
 
                   DWORD length = IsWChar<C>::value? 
                         GetFullPathNameW((LPCWSTR)path.c_str(), 
-                              size / sizeof(TCHAR),
+                              size / sizeof(C),
                               (LPWSTR)buf,
                               nullptr) : 
                         GetFullPathNameA((LPCSTR)path.c_str(), 
@@ -907,10 +905,10 @@ namespace filewatch {
 
                         fstat(entry.second.fd, &stat);
                         if (fdIsRemoved(entry.second.fd)) {
-                              events.push_back(EventInfo {
-                                    .event = Event::removed,
-                                    .file = entry.first,
-                                    .time = stat.st_ctimespec
+                              events.push_back(EventInfo{
+                                  .file = entry.first,
+                                  .time = stat.st_ctimespec,
+                                  .event = Event::removed,
                               });
                               continue;
                         }
@@ -919,32 +917,32 @@ namespace filewatch {
                         PathParts pathPair = splitPath(fullPath);
 
                         if (pathPair.directory != _path) {
-                              events.push_back(EventInfo {
-                                    .event = Event::removed,
-                                    .file = entry.first,
-                                    .time = stat.st_ctimespec
+                              events.push_back(EventInfo{
+                                  .file = entry.first,
+                                  .time = stat.st_ctimespec,
+                                  .event = Event::removed,
                               });
                               continue;
                         }
                         if (entry.first != pathPair.filename) {
-                              events.push_back(EventInfo {
-                                    .event = Event::renamed_old,
-                                    .file = entry.first,
-                                    .time = stat.st_ctimespec
+                              events.push_back(EventInfo{
+                                  .file = entry.first,
+                                  .time = stat.st_ctimespec,
+                                  .event = Event::renamed_old,
                               });
-                              events.push_back(EventInfo {
-                                    .event = Event::renamed_new,
-                                    .file = pathPair.filename,
-                                    .time = stat.st_ctimespec
+                              events.push_back(EventInfo{
+                                  .file = pathPair.filename,
+                                  .time = stat.st_ctimespec,
+                                  .event = Event::renamed_new,
                               });
                         }
                         else {
                               if (stat.st_mtimespec.tv_sec > entry.second.last_modification) {
                                     entry.second.last_modification = stat.st_mtimespec.tv_sec;
-                                    events.push_back(EventInfo {
-                                          .event = Event::modified,
-                                          .file = pathPair.filename,
-                                          .time = stat.st_mtimespec
+                                    events.push_back(EventInfo{
+                                        .file = pathPair.filename,
+                                        .time = stat.st_mtimespec,
+                                        .event = Event::modified,
                                     });
                               }
                         }
@@ -961,10 +959,10 @@ namespace filewatch {
                               struct stat stat;
                               
                               fstat(state.fd, &stat);
-                              events.push_back(EventInfo {
-                                    .event = Event::added,
-                                    .file = file,
-                                    .time = stat.st_mtimespec
+                              events.push_back(EventInfo{
+                                  .file = file,
+                                  .time = stat.st_mtimespec,
+                                  .event = Event::added,
                               });
                               newSnapshot.insert(std::make_pair(file, std::move(state)));
                         }
@@ -1087,15 +1085,15 @@ namespace filewatch {
                   }
                   else if (flags & kFSEventStreamEventFlagItemRenamed) {
                         const auto state = _directory_snapshot.find(pathPair.filename);
-                        assert(state != _directory_snapshot.end());
-                        StringType fdPath = pathOfFd(state->second.fd);
+                        if (state != _directory_snapshot.end()) {
+                              StringType fdPath = pathOfFd(state->second.fd);
 
-                        // moved/delete to Trash folder
-                        if (!isInDirectory(absolutePath, fdPath)) {
-                              event = Event::removed;
-                              _directory_snapshot.erase(pathPair.filename);
-                        }
-                        else {
+                              // moved/delete to Trash folder
+                              if (!isInDirectory(absolutePath, fdPath)) {
+                                    event = Event::removed;
+                                    _directory_snapshot.erase(pathPair.filename);
+                              }
+                        } else {
                               event = Event::renamed_old;
                               _previous_event_is_rename = true;
                         }
@@ -1204,13 +1202,10 @@ namespace filewatch {
             }
 
             void monitor_directory() {
-                  _run_loop = CFRunLoopGetCurrent();
-                  FSEventStreamScheduleWithRunLoop(_directory, 
-                        _run_loop, 
-                        kCFRunLoopDefaultMode);
+                  _queue = dispatch_queue_create("DirectoryWatcher", DISPATCH_QUEUE_SERIAL);
+                  FSEventStreamSetDispatchQueue(_directory, _queue);
                   FSEventStreamStart(_directory);
                   _running.set_value();
-                  CFRunLoopRun();
             }
 #endif // FILEWATCH_PLATFORM_MAC
 
