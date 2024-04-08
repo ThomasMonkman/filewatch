@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.1)
 # Project name
 project( FileWatch VERSION 0.0.1 LANGUAGES C CXX)
 
+add_library(filewatch INTERACE)
+target_include_directories(filewatch INTERFACE {CMAKE_CURRENT_SOURCE_DIR})
+add_library(filewatch::filewatch ALIAS filewatch)
+
 option(BuildTests "Build the unit tests" ON)
 enable_testing()
 
