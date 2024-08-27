@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.1)
 # Project name
 project( FileWatch VERSION 0.0.1 LANGUAGES C CXX)
 
-option(BuildTests "Build the unit tests" ON)
+option(FileWatch_Build_Example "Build the example")
+option(FileWatch_Build_Tests "Build the unit tests")
+option(FileWatch_Build_Tests_FileSystem "Build the unit c++17 > filesystem tests")
 enable_testing()
 
 # Enable c++11
@@ -18,8 +20,8 @@ else()
 endif()
 
 if(APPLE)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -framework CoreServices")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -framework CoreServices")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 endif()
 
 # dial up the warnings
@@ -36,9 +38,11 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -pedantic")
 endif()
 
-# create and configure the unit test target
-if(BuildTests)
-    add_subdirectory(tests)
-endif()
 
-# add_subdirectory(example)
+# create and configure the unit test target
+add_subdirectory(tests)
+
+
+if(FileWatch_Build_Example)
+    add_subdirectory(example)
+endif()

@@ -9,11 +9,11 @@ Single header folder/file watcher in C++11 for windows and linux, with optional 
 Drop [FileWatch.hpp](https://github.com/ThomasMonkman/filewatch/blob/master/FileWatch.hpp) in to your include path, and you should be good to go.
 
 #### Compiler Support:
-
+ 
 Works on:
 
-- Clang 4 and higher    
-- GCC 4.8 and higher    
+- Clang 4 and higher
+- GCC 4.8 and higher
 - Visual Studio 2015 and higher should be supported, however only 2019 is on the ci and tested
 
 #### Examples:
@@ -29,7 +29,7 @@ On linux or none unicode windows change std::wstring for std::string or std::fil
 ###### Simple: <a id="1"></a>
 ```cpp
 filewatch::FileWatch<std::wstring> watch(
-	L"C:/Users/User/Desktop/Watch/Test"s, 
+	L"C:/Users/User/Desktop/Watch/Test"s,
 	[](const std::wstring& path, const filewatch::Event change_type) {
 		std::wcout << path << L"\n";
 	}
@@ -39,7 +39,7 @@ filewatch::FileWatch<std::wstring> watch(
 ###### Change Type: <a id="2"></a>
 ```cpp
 filewatch::FileWatch<std::wstring> watch(
-	L"C:/Users/User/Desktop/Watch/Test"s, 
+	L"C:/Users/User/Desktop/Watch/Test"s,
 	[](const std::wstring& path, const filewatch::Event change_type) {
 		std::wcout << path << L" : ";
 		switch (change_type)
@@ -80,9 +80,9 @@ filewatch::FileWatch<std::wstring> watch(
 ###### Using std::filesystem: <a id="4"></a>
 ```cpp
 filewatch::FileWatch<std::filesystem::path> watch(
-	L"C:/Users/User/Desktop/Watch/Test"s, 
+	L"C:/Users/User/Desktop/Watch/Test"s,
 	[](const std::filesystem::path& path, const filewatch::Event change_type) {
-		std::wcout << std::filesystem::absolute(path) << L"\n";		
+		std::wcout << std::filesystem::absolute(path) << L"\n";
 	}
 );
 ```
@@ -90,9 +90,9 @@ filewatch::FileWatch<std::filesystem::path> watch(
 ###### Works with relative paths: <a id="5"></a>
 ```cpp
 filewatch::FileWatch<std::filesystem::path> watch(
-	L"./"s, 
+	L"./"s,
 	[](const std::filesystem::path& path, const filewatch::Event change_type) {
-		std::wcout << std::filesystem::absolute(path) << L"\n";		
+		std::wcout << std::filesystem::absolute(path) << L"\n";
 	}
 );
 ```
@@ -100,9 +100,9 @@ filewatch::FileWatch<std::filesystem::path> watch(
 ###### Single file watch: <a id="6"></a>
 ```cpp
 filewatch::FileWatch<std::wstring> watch(
-	L"./test.txt"s, 
+	L"./test.txt"s,
 	[](const std::wstring& path, const filewatch::Event change_type) {
-		std::wcout << path << L"\n";		
+		std::wcout << path << L"\n";
 	}
 );
 ```
