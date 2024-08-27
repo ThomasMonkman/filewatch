@@ -1117,29 +1117,48 @@ namespace filewatch {
                   _cv.notify_all();
             }
 
-            static void handleFsEvent(__attribute__((unused)) ConstFSEventStreamRef streamFef, 
-                                          void* clientCallBackInfo, 
-                                          size_t numEvents, 
-                                          CFArrayRef eventPaths, 
-                                          const FSEventStreamEventFlags* eventFlags, 
-                                          __attribute__((unused)) const FSEventStreamEventId* eventIds) {
-                  FileWatch<StringType>* self = (FileWatch<StringType>*)clientCallBackInfo;
+			static void handleFsEvent(__attribute__((unused)) ConstFSEventStreamRef streamFef,
+			                          void *clientCallBackInfo,
+			                          size_t numEvents,
+			                          CFArrayRef eventPaths,
+			                          const FSEventStreamEventFlags *eventFlags,
+			                          __attribute__((unused)) const FSEventStreamEventId *eventIds)
+			{
+				FileWatch<StringType> *self = (FileWatch<StringType> *)clientCallBackInfo;
 
-                  for (size_t i = 0; i < numEvents; i++) {
-                        FSEventStreamEventFlags flag = eventFlags[i];
-                        CFStringRef path = (CFStringRef)CFArrayGetValueAtIndex(eventPaths, i);
+				for (size_t i = 0; i < numEvents; i++)
+				{
+					FSEventStreamEventFlags flag = eventFlags[i];
+					CFStringRef             path = (CFStringRef)CFArrayGetValueAtIndex(eventPaths, i);
 
-                        if (self->_watching_single_file) {
-                              self->seeSingleFileChanges();
-                        }
-                        else if (flag & kFSEventStreamEventFlagMustScanSubDirs) {
-                                    self->walkAndSeeChanges();
-                        }
-                        else {
-                              self->notify(path, flag);
-                        }
-                  }
-            }
+					// Convert CFStringRef to StringType
+					CFIndex pathLength = CFStringGetLength(path);
+					char    buffer[PATH_MAX + 1];
+					CFStringGetCString(path, buffer, PATH_MAX, IsWChar<C>::value ? kCFStringEncodingUTF32 : kCFStringEncodingUTF8);
+					StringType absolutePath = StringType { (const C *)buffer, static_cast<size_t>(pathLength) };
+					PathParts  pathPair     = self->splitPath(absolutePath);
+
+					// Ensure the event belongs to the monitored file or directory
+					if (self->_watching_single_file)
+					{
+						if (pathPair.filename == self->_filename)
+						{
+							self->seeSingleFileChanges();
+						}
+					}
+					else if (flag & kFSEventStreamEventFlagMustScanSubDirs)
+					{
+						if (isInDirectory(absolutePath, self->_path))
+						{
+							self->walkAndSeeChanges();
+						}
+					}
+					else
+					{
+						self->notify(path, flag);
+					}
+				}
+			}
 
             FSEventStreamRef openStream(const StringType& directory) {
                   CFStringEncoding encoding = IsWChar<C>::value? 
