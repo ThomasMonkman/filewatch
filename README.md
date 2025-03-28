@@ -12,9 +12,9 @@ Drop [FileWatch.hpp](https://github.com/ThomasMonkman/filewatch/blob/master/File
 
 Works on:
 
-- Clang 4 and higher    
-- GCC 4.8 and higher    
-- Visual Studio 2015 and higher should be supported, however only 2019 is on the ci and tested
+- Clang 4 and higher
+- GCC 11 and higher
+- Visual Studio 2017 and higher should be supported, however only 2019 is on the ci and tested
 
 #### Examples:
 - [Simple](#1)
@@ -24,13 +24,12 @@ Works on:
 - [Works with relative paths](#5)
 - [Single file watch](#6)
 
-On linux or none unicode windows change std::wstring for std::string or std::filesystem (boost should work as well).
 
 ###### Simple: <a id="1"></a>
 ```cpp
-filewatch::FileWatch<std::wstring> watch(
+filewatch::FileWatch watch(
 	L"C:/Users/User/Desktop/Watch/Test"s, 
-	[](const std::wstring& path, const filewatch::Event change_type) {
+	[](const std::filesystem::path& path, const filewatch::Event change_type) {
 		std::wcout << path << L"\n";
 	}
 );
@@ -38,9 +37,9 @@ filewatch::FileWatch<std::wstring> watch(
 
 ###### Change Type: <a id="2"></a>
 ```cpp
-filewatch::FileWatch<std::wstring> watch(
+filewatch::FileWatch watch(
 	L"C:/Users/User/Desktop/Watch/Test"s, 
-	[](const std::wstring& path, const filewatch::Event change_type) {
+	[](const std::filesystem::path& path, const filewatch::Event change_type) {
 		std::wcout << path << L" : ";
 		switch (change_type)
 		{
@@ -68,10 +67,10 @@ filewatch::FileWatch<std::wstring> watch(
 
 Using the standard regex libary you can filter the file paths that will trigger. When using wstring you will have to use `std::wregex`
 ```cpp
-filewatch::FileWatch<std::wstring> watch(
+filewatch::FileWatch watch(
 	L"C:/Users/User/Desktop/Watch/Test"s,
 	std::wregex(L"test.*"),
-	[](const std::wstring& path, const filewatch::Event change_type) {
+	[](const std::filesystem::path& path, const filewatch::Event change_type) {
 		std::wcout << path << L"\n";
 	}
 );
@@ -79,7 +78,7 @@ filewatch::FileWatch<std::wstring> watch(
 
 ###### Using std::filesystem: <a id="4"></a>
 ```cpp
-filewatch::FileWatch<std::filesystem::path> watch(
+filewatch::FileWatch watch(
 	L"C:/Users/User/Desktop/Watch/Test"s, 
 	[](const std::filesystem::path& path, const filewatch::Event change_type) {
 		std::wcout << std::filesystem::absolute(path) << L"\n";		
@@ -89,7 +88,7 @@ filewatch::FileWatch<std::filesystem::path> watch(
 
 ###### Works with relative paths: <a id="5"></a>
 ```cpp
-filewatch::FileWatch<std::filesystem::path> watch(
+filewatch::FileWatch watch(
 	L"./"s, 
 	[](const std::filesystem::path& path, const filewatch::Event change_type) {
 		std::wcout << std::filesystem::absolute(path) << L"\n";		
@@ -99,9 +98,9 @@ filewatch::FileWatch<std::filesystem::path> watch(
 
 ###### Single file watch: <a id="6"></a>
 ```cpp
-filewatch::FileWatch<std::wstring> watch(
+filewatch::FileWatch watch(
 	L"./test.txt"s, 
-	[](const std::wstring& path, const filewatch::Event change_type) {
+	[](const std::filesystem::path& path, const filewatch::Event change_type) {
 		std::wcout << path << L"\n";		
 	}
 );
