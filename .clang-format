@@ -4,10 +4,9 @@ BasedOnStyle: LLVM
 
 
 # indent
-UseTab: ForIndentation
+UseTab: ForContinuationAndIndentation
 IndentWidth: 8
-AccessModifierOffset: -8  #this aligns the modifiers to the class
-
+AccessModifierOffset: -8
 
 # Indentations
 IndentAccessModifiers: false
@@ -29,14 +28,14 @@ BraceWrapping:
   AfterEnum: false
   AfterStruct: false
   AfterUnion: false
-  BeforeCatch: true
-  BeforeElse: true
-  BeforeLambdaBody: true
+  BeforeCatch: false
+  BeforeElse: false
   SplitEmptyRecord: false
+  BeforeLambdaBody: false
 
 # alignment
 BinPackArguments: false
-BreakBinaryOperations: OnePerLine
+# BreakBinaryOperations: OnePerLine
 
 
 # access modifiers
