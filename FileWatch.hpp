@@ -289,7 +289,7 @@ namespace filewatch {
 		bool pass_filter(const fs::path &file_path)
 		{
 			return (_watching_single_file) ? file_path.filename() == _filename
-			                               : std::regex_match(file_path.u8string(), _pattern);
+						       : std::regex_match(file_path.filename().u8string(), _pattern);
 		}
 
 		void callback_thread()
@@ -413,15 +413,12 @@ namespace filewatch {
 					callbacks.emplace_back(std::make_pair(relPath, Event::renamed_new));
 				}
 				_directory_snapshot.insert(path, makeFileState(path));
-			}
-			else if ((flags & kFSEventStreamEventFlagItemModified)) {
+			} else if ((flags & kFSEventStreamEventFlagItemModified) && regex_matched) {
 				if (_directory_snapshot.find(path) != _directory_snapshot.states.end()) {
 					callbacks.emplace_back(std::make_pair(relPath, Event::modified));
 				}
-			}
-			else if ((flags & kFSEventStreamEventFlagItemCreated) &&
-			         regex_matched &&
-			         !this->_watching_single_file)
+			} else if ((flags & kFSEventStreamEventFlagItemCreated) && regex_matched &&
+				   !this->_watching_single_file)
 			{
 				_directory_snapshot.insert(path, makeFileState(path));
 				callbacks.emplace_back(std::make_pair(relPath, Event::added));
@@ -518,7 +515,7 @@ namespace filewatch {
 			if (fs::is_directory(directory) && !this->_watching_single_file) {
 				for (const auto &dir_entry : fs::directory_iterator{directory}) {
 					const auto &path = dir_entry.path();
-					if (std::regex_match(path.u8string(), this->_pattern)) {
+					if (std::regex_match(path.filename().u8string(), this->_pattern)) {
 						_directory_snapshot.insert(path, makeFileState(path));
 					}
 				}
@@ -561,6 +558,10 @@ namespace filewatch {
 			FSEventStreamSetDispatchQueue(_directory, _queue);
 			FSEventStreamStart(_directory);
 			this->_running.set_value();
+		}
+
+		void close()
+		{
 		}
 
 		void destroy()
