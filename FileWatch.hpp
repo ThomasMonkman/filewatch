@@ -95,45 +95,49 @@ namespace filewatch {
 		renamed_old,
 		renamed_new
 	};
-      
-      template<typename Fn, typename... Args>
-      struct Invokable {
-            static Fn make() {
-                  return (Fn*)0;
-            }
 
-            template<typename T>
-            static T defaultValue() {
-                  return *(T*)0;
-            }
+	template <typename Fn, typename... Args>
+	struct Invokable {
+		static Fn make()
+		{
+			return (Fn *)0;
+		}
 
-            static void call(int) {
-                  make()(defaultValue<Args...>());
-            }
+		template <typename T>
+		static T defaultValue()
+		{
+			return *(T *)0;
+		}
 
-            static int call(long value);
+		static void call(int)
+		{
+			make()(defaultValue<Args...>());
+		}
 
-            static constexpr bool value = std::is_same<decltype(call(0)), int>::value;
-      };
+		static int call(long value);
+
+		static constexpr bool value = std::is_same<decltype(call(0)), int>::value;
+	};
 
 #define _FILEWATCH_TO_STRING(x) #x
 #define FILEWATCH_TO_STRING(x) _FILEWATCH_TO_STRING(x)
 
-      [[maybe_unused]] static const char* event_to_string(Event event) {
-            switch (event) {
-            case Event::added:
-                  return FILEWATCH_TO_STRING(Event::added);
-            case Event::removed:
-                  return FILEWATCH_TO_STRING(Event::removed);
-            case Event::modified:
-                  return FILEWATCH_TO_STRING(Event::modified);
-            case Event::renamed_old:
-                  return FILEWATCH_TO_STRING(Event:renamed_old);
-            case Event::renamed_new:
-                  return FILEWATCH_TO_STRING(Event::renamed_new);
-            }
-            assert(false);
-      }
+	[[maybe_unused]] static const char *event_to_string(Event event)
+	{
+		switch (event) {
+		case Event::added:
+			return FILEWATCH_TO_STRING(Event::added);
+		case Event::removed:
+			return FILEWATCH_TO_STRING(Event::removed);
+		case Event::modified:
+			return FILEWATCH_TO_STRING(Event::modified);
+		case Event::renamed_old:
+			return FILEWATCH_TO_STRING(Event : renamed_old);
+		case Event::renamed_new:
+			return FILEWATCH_TO_STRING(Event::renamed_new);
+		}
+		assert(false);
+	}
 
       /**
        * \class FileWatchBase
