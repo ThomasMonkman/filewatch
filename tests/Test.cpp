@@ -38,11 +38,10 @@ TEST_CASE("watch for file add", "[added]")
 	std::promise<test_string> promise;
 	std::future<test_string> future = promise.get_future();
 	filewatch::FileWatch watch(fs::current_path(),
-	                           [&promise](const fs::path &path, const filewatch::Event change_type)
-	                           {
-		                           (void)change_type;
-		                           promise.set_value(path);
-	                           });
+				   [&promise](const fs::path &path, const filewatch::Event change_type) {
+					   (void)change_type;
+					   promise.set_value(path);
+				   });
 
 	testhelper::create_and_modify_file(test_file_name);
 
@@ -61,13 +60,12 @@ TEST_CASE("single file", "[single-file]")
 	std::promise<test_string> promise;
 	std::future<test_string> future = promise.get_future();
 
-	filewatch::FileWatch watch(test_path,
-	                           [&promise, &test_file_name](const fs::path &path, const filewatch::Event change_type)
-	                           {
-		                           (void)change_type;
-		                           REQUIRE(path.filename() == test_file_name);
-		                           promise.set_value(path);
-	                           });
+	filewatch::FileWatch watch(
+	    test_path, [&promise, &test_file_name](const fs::path &path, const filewatch::Event change_type) {
+		    (void)change_type;
+		    REQUIRE(path.filename() == test_file_name);
+		    promise.set_value(path);
+	    });
 
 	testhelper::create_and_modify_file(test_ignore_path);
 	testhelper::create_and_modify_file(test_file_name);
@@ -76,10 +74,11 @@ TEST_CASE("single file", "[single-file]")
 	REQUIRE(path == test_file_name);
 }
 
-TEST_CASE("copy constructor", "[constructors]") {
+TEST_CASE("copy constructor", "[constructors]")
+{
 	const auto test_folder_path = testhelper::cross_platform_string("./");
 	const auto test_file_name = testhelper::cross_platform_string("test.txt");
-	
+
 	std::promise<void> promise;
 	std::future<void> future = promise.get_future();
 	std::vector<test_string> files_triggered;
@@ -88,29 +87,31 @@ TEST_CASE("copy constructor", "[constructors]") {
 	const auto expected_triggers = 2u;
 
 	filewatch::FileWatch watch(test_folder_path,
-	                           [&promise, &files_triggered, &file_watch_threads, &expected_triggers, &mutex](
-	                               const test_string &path, const filewatch::Event change_type)
-	                           {
-		                           std::lock_guard<std::mutex> lock(mutex);
-		                           (void)change_type;
-		                           file_watch_threads.insert(std::this_thread::get_id());
-		                           files_triggered.push_back(path);
-		                           if (file_watch_threads.size() == expected_triggers) {
-			                           promise.set_value();
-		                           }
-	                           });
+				   [&promise, &files_triggered, &file_watch_threads, &expected_triggers, &mutex](
+				       const test_string &path, const filewatch::Event change_type) {
+					   std::lock_guard<std::mutex> lock(mutex);
+					   (void)change_type;
+					   file_watch_threads.insert(std::this_thread::get_id());
+					   files_triggered.push_back(path);
+					   if (file_watch_threads.size() == expected_triggers) {
+						   promise.set_value();
+					   }
+				   });
 
 	filewatch::FileWatch watch2(watch);
 
 	testhelper::create_and_modify_file(test_file_name);
 
 	testhelper::get_with_timeout(future);
-	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name; });
+	const auto files_match =
+	    std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string &path) {
+		    return path == test_file_name;
+	    });
 	REQUIRE(files_match);
 }
 
-
-TEST_CASE("copy assignment operator", "[operator]") {
+TEST_CASE("copy assignment operator", "[operator]")
+{
 	const auto test_folder_path = testhelper::cross_platform_string("./");
 	const auto test_file_name = testhelper::cross_platform_string("test.txt");
 
@@ -122,25 +123,27 @@ TEST_CASE("copy assignment operator", "[operator]") {
 	const auto expected_triggers = 2u;
 
 	filewatch::FileWatch watch(test_folder_path,
-	                           [&promise, &files_triggered, &file_watch_threads, &expected_triggers, &mutex](
-	                               const test_string &path, const filewatch::Event change_type)
-	                           {
-		                           std::lock_guard<std::mutex> lock(mutex);
-		                           (void)change_type;
-		                           (void)expected_triggers;
-		                           file_watch_threads.insert(std::this_thread::get_id());
-		                           files_triggered.push_back(path);
-		                           if (file_watch_threads.size() == expected_triggers) {
-			                           promise.set_value();
-		                           }
-	                           });
+				   [&promise, &files_triggered, &file_watch_threads, &expected_triggers, &mutex](
+				       const test_string &path, const filewatch::Event change_type) {
+					   std::lock_guard<std::mutex> lock(mutex);
+					   (void)change_type;
+					   (void)expected_triggers;
+					   file_watch_threads.insert(std::this_thread::get_id());
+					   files_triggered.push_back(path);
+					   if (file_watch_threads.size() == expected_triggers) {
+						   promise.set_value();
+					   }
+				   });
 
 	filewatch::FileWatch watch2 = watch;
 
 	testhelper::create_and_modify_file(test_file_name);
 
 	testhelper::get_with_timeout(future);
-	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name; });
+	const auto files_match =
+	    std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string &path) {
+		    return path == test_file_name;
+	    });
 	REQUIRE(files_match);
 }
 
@@ -158,8 +161,7 @@ TEST_CASE("regex", "[regex]")
 	filewatch::FileWatch watch(
 	    test_folder_path,
 	    std::regex("test.*"),
-	    [&promise, &test_file_name](const test_string &path, const filewatch::Event change_type)
-	    {
+	    [&promise, &test_file_name](const test_string &path, const filewatch::Event change_type) {
 		    (void)change_type;
 		    REQUIRE(path == test_file_name);
 		    promise.set_value(path);
