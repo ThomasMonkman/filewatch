@@ -19,18 +19,18 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
    endif()
 endif()
 
+find_package(Threads REQUIRED)
+
 add_library(FileWatch INTERFACE)
-target_include_directories(FileWatch INTERFACE ${CMAKE_SOURCE_DIR})
+target_include_directories(FileWatch INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(FileWatch INTERFACE
   $<$<PLATFORM_ID:Linux>:-DFILEWATCH_PLATFORM_LINUX=1>
   $<$<PLATFORM_ID:Darwin>:-DFILEWATCH_PLATFORM_MAC=1>
   $<$<PLATFORM_ID:Windows>:-DFILEWATCH_PLATFORM_WIN=1>
 )
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  target_link_options(FileWatch INTERFACE -framework CoreServices)
-
-endif()
+target_link_libraries(FileWatch INTERFACE Threads::Threads)
+target_link_options(FileWatch INTERFACE   $<$<PLATFORM_ID:Darwin>:-framework CoreServices>)
 
 # dial up the warnings
 if(MSVC)
