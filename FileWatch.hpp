@@ -320,6 +320,12 @@ namespace filewatch {
 #if defined(FILEWATCH_PLATFORM_MAC)
 
 namespace filewatch {
+
+	/* The implementation is based off
+	   https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/FSEvents_ProgGuide/UsingtheFSEventsFramework/UsingtheFSEventsFramework.html
+	 *
+	 * Including the idea of taking a snapshot of the directory
+	 */
 	class _FileWatch : public FileWatchBase<_FileWatch> {
 		friend FileWatchBase<_FileWatch>;
 
@@ -413,17 +419,18 @@ namespace filewatch {
 					callbacks.emplace_back(std::make_pair(relPath, Event::renamed_new));
 				}
 				_directory_snapshot.insert(path, makeFileState(path));
-			} else if ((flags & kFSEventStreamEventFlagItemModified) && regex_matched) {
-				if (_directory_snapshot.find(path) != _directory_snapshot.states.end()) {
-					callbacks.emplace_back(std::make_pair(relPath, Event::modified));
-				}
 			} else if ((flags & kFSEventStreamEventFlagItemCreated) && regex_matched &&
 				   !this->_watching_single_file)
 			{
 				_directory_snapshot.insert(path, makeFileState(path));
 				callbacks.emplace_back(std::make_pair(relPath, Event::added));
-			}
-			else if (flags & kFSEventStreamEventFlagItemRemoved) {
+			} else if ((flags & kFSEventStreamEventFlagItemModified) && regex_matched) {
+				if (_directory_snapshot.find(path) == _directory_snapshot.states.end()) {
+					// for some reason that the we don not have it in the snapshot
+					_directory_snapshot.insert(path, makeFileState(path));
+				}
+				callbacks.emplace_back(std::make_pair(relPath, Event::modified));
+			} else if (flags & kFSEventStreamEventFlagItemRemoved) {
 				if (_directory_snapshot.find(path) != _directory_snapshot.states.end()) {
 					_directory_snapshot.erase(path);
 					callbacks.emplace_back(std::make_pair(relPath, Event::removed));
