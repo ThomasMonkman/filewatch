@@ -139,83 +139,90 @@ namespace filewatch {
 		assert(false);
 	}
 
-      /**
-       * \class FileWatchBase
-       *
-       * \brief Watches a folder or file, and will notify of changes via function callback.
-       *
-       * \author Thomas Monkman
-       *
-       */
-      template <class SubClass>
-      class FileWatchBase {
-      public:
-	      ~FileWatchBase()
-	      {
-		      destroy();
-	      }
+	/**
+	 * \class FileWatchBase
+	 *
+	 * \brief Watches a folder or file, and will notify of changes via function callback.
+	 *
+	 * \author Thomas Monkman
+	 *
+	 */
+	template <class SubClass>
+	class FileWatchBase {
+	public:
+		~FileWatchBase()
+		{
+			destroy();
+		}
 
-	      FileWatchBase &operator=(const FileWatchBase &other)
-	      {
-		      if (this == &other) {
-			      return *this;
-		      }
+		FileWatchBase &operator=(const FileWatchBase &other)
+		{
+			if (this == &other) {
+				return *this;
+			}
 
-		      destroy();
-		      _path = other._path;
-		      _callback = other._callback;
-		      init();
-		      return *this;
-	      }
+			destroy();
+			_path = other._path;
+			_callback = other._callback;
+			init();
+			return *this;
+		}
 
-	      // Const memeber varibles don't let me implent moves nicely, if moves are really wanted std::unique_ptr
-	      // should be used and move that.
-	      FileWatchBase(FileWatchBase &&) = delete;
-	      FileWatchBase &operator=(FileWatchBase &&) & = delete;
+		// Const memeber varibles don't let me implent moves nicely, if moves are really wanted std::unique_ptr
+		// should be used and move that.
+		FileWatchBase(FileWatchBase &&) = delete;
+		FileWatchBase &operator=(FileWatchBase &&) & = delete;
 
-      protected:
-	      FileWatchBase(const fs::path &path, const std::regex &pattern,
-		            std::function<void(const fs::path &file, const Event event_type)> callback)
-		  : _path(fs::canonical(path)), _pattern(pattern), _callback(callback)
-	      {
-		      if (!fs::exists(path)) {
-			      throw fs::filesystem_error("no such file exists", path, std::error_code());
-		      }
-		      // init();
-	      }
+	protected:
+		FileWatchBase(const fs::path &path, const std::regex &pattern,
+			      std::function<void(const fs::path &file, const Event event_type)> callback)
+		    : _path(fs::canonical(path)), _pattern(pattern),
+		      _filename(fs::is_directory(path) ? "" : path.filename()), _callback(callback),
+		      _watching_single_file(!fs::is_directory(path))
+		{
+			if (!fs::exists(path)) {
+				throw fs::filesystem_error("no such file exists", path, std::error_code());
+			}
+			// init();
+		}
 
-      protected:
-	      static constexpr char _regex_all[] = {'.', '*', '\0'};
-	      static constexpr char _this_directory[] = {'.', '/', '\0'};
+	protected:
+		static constexpr char _regex_all[] = {'.', '*', '\0'};
+		static constexpr char _this_directory[] = {'.', '/', '\0'};
 
-	      struct PathParts {
-		      fs::path directory;
-		      fs::path filename;
-	      };
-	      // the path to watch, either a single file or directory
-	      fs::path _path;
-	      // additional filters
-	      std::regex _pattern;
-	      // only used if watch a single file
-	      fs::path _filename;
+		struct PathParts {
+			fs::path directory;
+			fs::path filename;
+		};
+		// the path to watch, either a single file or directory
+		fs::path _path;
+		// additional filters
+		std::regex _pattern;
+		// only used if watch a single file
+		fs::path _filename;
 
-	      std::function<void(const fs::path &file, const Event event_type)> _callback;
+		std::function<void(const fs::path &file, const Event event_type)> _callback;
 
-	      std::thread _watch_thread;
+		std::thread _watch_thread;
 
-	      std::condition_variable _cv;
-	      std::mutex _callback_mutex;
-	      std::vector<std::pair<fs::path, Event>> _callback_information;
-	      std::thread _callback_thread;
+		std::condition_variable _cv;
+		std::mutex _callback_mutex;
+		std::vector<std::pair<fs::path, Event>> _callback_information;
+		std::thread _callback_thread;
 
-	      std::promise<void> _running;
-	      std::atomic<bool> _destory = {false};
-	      bool _watching_single_file = {false};
+		std::promise<void> _running;
+		std::atomic<bool> _destory = {false};
+		bool _watching_single_file = {false};
 
-#if FILEWATCH_PLATFORM_MAC
-
-#endif // FILEWATCH_PLATFORM_MAC
-
+	protected:
+		bool watching_single_file() const
+		{
+			return fs::is_regular_file(_path);
+		}
+		fs::path filename() const
+		{
+			return fs::is_directory(_path) ? fs::path() : _path.filename();
+		}
 		void init()
 		{
 			static_cast<SubClass *>(this)->get_directory(_path);
@@ -226,8 +233,8 @@ namespace filewatch {
 				} catch (...) {
 					try {
 						_running.set_exception(std::current_exception());
-					}
-					catch (...) {} // set_exception() may throw too
+					} catch (...) {
+					} // set_exception() may throw too
 				}
 			});
 
@@ -247,7 +254,7 @@ namespace filewatch {
 			    });
 
 			std::future<void> future = _running.get_future();
-			future.get(); //block until the monitor_directory is up and running
+			future.get(); // block until the monitor_directory is up and running
 		}
 
 		void destroy()
@@ -307,7 +314,7 @@ namespace filewatch {
 				}
 			}
 		}
-      };
+	};
 } // namespace filewatch
 
 #if defined(FILEWATCH_PLATFORM_MAC)
