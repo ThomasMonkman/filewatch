@@ -3,8 +3,9 @@ cmake_minimum_required(VERSION 3.10)
 # Project name
 project( FileWatch VERSION 0.0.2 LANGUAGES C CXX)
 
-option(BuildTests "Build the unit tests" ON)
-enable_testing()
+option(FILEWATCH_BUILD_TESTS "Build the unit tests" ON)
+option(FILEWATCH_BUILD_EXAMPLE "Build the examples" OFF)
+
 
 # Enable c++17 required for std::filesystem
 set(CMAKE_CXX_STANDARD 17)
@@ -47,8 +48,11 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 # create and configure the unit test target
-if(BuildTests)
-    add_subdirectory(tests)
+if(FILEWATCH_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
 endif()
 
-# add_subdirectory(example)
+if (FILEWATCH_BUILD_EXAMPLE)
+  add_subdirectory(example)
+endif()
