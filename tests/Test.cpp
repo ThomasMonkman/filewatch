@@ -14,28 +14,34 @@ using test_char = char*;
 using test_regex = std::regex;
 #endif // __unix__
 
-#include "catch/catch.hpp"
+#include "catch2/catch_test_macros.hpp"
 
 #include "../FileWatch.hpp"
 
 #include "Util/TestHelper.hpp"
 
-#include <future>
 #include <algorithm>
+#include <filesystem>
+#include <future>
+#include <iostream>
 #include <mutex>
-#include <vector>
 #include <set>
 #include <thread>
+#include <vector>
 
-TEST_CASE("watch for file add", "[added]") {
-	const auto test_folder_path = testhelper::cross_platform_string("./");
+namespace fs = std::filesystem;
+
+TEST_CASE("watch for file add", "[added]")
+{
 	const auto test_file_name = testhelper::cross_platform_string("test.txt");
 
 	std::promise<test_string> promise;
 	std::future<test_string> future = promise.get_future();
-	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise](const test_string& path, const filewatch::Event change_type) {
-		promise.set_value(path);
-	});
+	filewatch::FileWatch watch(fs::current_path(),
+				   [&promise](const fs::path &path, const filewatch::Event change_type) {
+					   (void)change_type;
+					   promise.set_value(path);
+				   });
 
 	testhelper::create_and_modify_file(test_file_name);
 
@@ -43,8 +49,9 @@ TEST_CASE("watch for file add", "[added]") {
 	REQUIRE(path == test_file_name);
 }
 
-TEST_CASE("single file", "[single-file]") {
-	const auto test_folder_path = testhelper::cross_platform_string("./test.txt");
+TEST_CASE("single file", "[single-file]")
+{
+	const auto test_path = testhelper::cross_platform_string("./test.txt");
 	const auto test_ignore_path = testhelper::cross_platform_string("./ignore.txt");
 	const auto test_file_name = testhelper::cross_platform_string("test.txt");
 	// create the file otherwise the Filewatch will throw
@@ -53,10 +60,12 @@ TEST_CASE("single file", "[single-file]") {
 	std::promise<test_string> promise;
 	std::future<test_string> future = promise.get_future();
 
-	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &test_file_name](const test_string& path, const filewatch::Event change_type) {
-		REQUIRE(path == test_file_name);
-		promise.set_value(path);
-	});
+	filewatch::FileWatch watch(
+	    test_path, [&promise, &test_file_name](const fs::path &path, const filewatch::Event change_type) {
+		    (void)change_type;
+		    REQUIRE(path.filename() == test_file_name);
+		    promise.set_value(path);
+	    });
 
 	testhelper::create_and_modify_file(test_ignore_path);
 	testhelper::create_and_modify_file(test_file_name);
@@ -65,38 +74,8 @@ TEST_CASE("single file", "[single-file]") {
 	REQUIRE(path == test_file_name);
 }
 
-
-TEST_CASE("copy constructor", "[constructors]") {
-	const auto test_folder_path = testhelper::cross_platform_string("./");
-	const auto test_file_name = testhelper::cross_platform_string("test.txt");
-	
-	std::promise<void> promise;
-	std::future<void> future = promise.get_future();
-	std::vector<test_string> files_triggered;
-	std::set<std::thread::id> file_watch_threads;
-	std::mutex mutex;
-	const auto expected_triggers = 2u;
-
-	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &file_watch_threads, &expected_triggers, &mutex](const test_string& path, const filewatch::Event change_type) {
-		std::lock_guard<std::mutex> lock(mutex);
-		file_watch_threads.insert(std::this_thread::get_id());
-		files_triggered.push_back(path);
-		if (file_watch_threads.size() == expected_triggers) {
-			promise.set_value();
-		}
-	});
-
-	filewatch::FileWatch<test_string> watch2(watch);
-
-	testhelper::create_and_modify_file(test_file_name);
-
-	testhelper::get_with_timeout(future);
-	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name; });
-	REQUIRE(files_match);
-}
-
-
-TEST_CASE("copy assignment operator", "[operator]") {
+TEST_CASE("copy constructor", "[constructors]")
+{
 	const auto test_folder_path = testhelper::cross_platform_string("./");
 	const auto test_file_name = testhelper::cross_platform_string("test.txt");
 
@@ -107,25 +86,69 @@ TEST_CASE("copy assignment operator", "[operator]") {
 	std::mutex mutex;
 	const auto expected_triggers = 2u;
 
-	filewatch::FileWatch<test_string> watch(test_folder_path, [&promise, &files_triggered, &file_watch_threads, &expected_triggers, &mutex](const test_string& path, const filewatch::Event change_type) {
-		std::lock_guard<std::mutex> lock(mutex);
-		file_watch_threads.insert(std::this_thread::get_id());
-		files_triggered.push_back(path);
-		if (file_watch_threads.size() == expected_triggers) {
-			promise.set_value();
-		}
-	});
+	filewatch::FileWatch watch(test_folder_path,
+				   [&promise, &files_triggered, &file_watch_threads, &expected_triggers, &mutex](
+				       const test_string &path, const filewatch::Event change_type) {
+					   std::lock_guard<std::mutex> lock(mutex);
+					   (void)change_type;
+					   file_watch_threads.insert(std::this_thread::get_id());
+					   files_triggered.push_back(path);
+					   if (file_watch_threads.size() == expected_triggers) {
+						   promise.set_value();
+					   }
+				   });
 
-	filewatch::FileWatch<test_string> watch2 = watch;
+	filewatch::FileWatch watch2(watch);
 
 	testhelper::create_and_modify_file(test_file_name);
 
 	testhelper::get_with_timeout(future);
-	const auto files_match = std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string& path) { return path == test_file_name; });
+	const auto files_match =
+	    std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string &path) {
+		    return path == test_file_name;
+	    });
 	REQUIRE(files_match);
 }
 
-TEST_CASE("regex", "[regex]") {
+TEST_CASE("copy assignment operator", "[operator]")
+{
+	const auto test_folder_path = testhelper::cross_platform_string("./");
+	const auto test_file_name = testhelper::cross_platform_string("test.txt");
+
+	std::promise<void> promise;
+	std::future<void> future = promise.get_future();
+	std::vector<test_string> files_triggered;
+	std::set<std::thread::id> file_watch_threads;
+	std::mutex mutex;
+	const auto expected_triggers = 2u;
+
+	filewatch::FileWatch watch(test_folder_path,
+				   [&promise, &files_triggered, &file_watch_threads, &expected_triggers, &mutex](
+				       const test_string &path, const filewatch::Event change_type) {
+					   std::lock_guard<std::mutex> lock(mutex);
+					   (void)change_type;
+					   (void)expected_triggers;
+					   file_watch_threads.insert(std::this_thread::get_id());
+					   files_triggered.push_back(path);
+					   if (file_watch_threads.size() == expected_triggers) {
+						   promise.set_value();
+					   }
+				   });
+
+	filewatch::FileWatch watch2 = watch;
+
+	testhelper::create_and_modify_file(test_file_name);
+
+	testhelper::get_with_timeout(future);
+	const auto files_match =
+	    std::all_of(files_triggered.begin(), files_triggered.end(), [&test_file_name](const test_string &path) {
+		    return path == test_file_name;
+	    });
+	REQUIRE(files_match);
+}
+
+TEST_CASE("regex", "[regex]")
+{
 	const auto test_folder_path = testhelper::cross_platform_string("./");
 	const auto test_ignore_path = testhelper::cross_platform_string("./ignore.txt");
 	const auto test_file_name = testhelper::cross_platform_string("test.txt");
@@ -135,10 +158,14 @@ TEST_CASE("regex", "[regex]") {
 	std::promise<test_string> promise;
 	std::future<test_string> future = promise.get_future();
 
-	filewatch::FileWatch<test_string> watch(test_folder_path, test_regex(testhelper::cross_platform_string("test.*")),[&promise, &test_file_name](const test_string& path, const filewatch::Event change_type) {
-		REQUIRE(path == test_file_name);
-		promise.set_value(path);
-	});
+	filewatch::FileWatch watch(
+	    test_folder_path,
+	    std::regex("test.*"),
+	    [&promise, &test_file_name](const test_string &path, const filewatch::Event change_type) {
+		    (void)change_type;
+		    REQUIRE(path == test_file_name);
+		    promise.set_value(path);
+	    });
 
 	testhelper::create_and_modify_file(test_ignore_path);
 	testhelper::create_and_modify_file(test_file_name);

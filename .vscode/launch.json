@@ -5,7 +5,7 @@
                   "type": "cppdbg",
                   "request": "launch",
                   "preLaunchTask": "build",
-                  "program": "${workspaceFolder}/build/example/main",
+                  "program": "${workspaceFolder}/build/example/filewatch",
                   "args": [],
                   "stopAtEntry": false,
                   "cwd": "${workspaceFolder}/build",

@@ -1,0 +1,45 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+
+# indent
+UseTab: ForContinuationAndIndentation
+IndentWidth: 8
+AccessModifierOffset: -8
+
+# Indentations
+IndentAccessModifiers: false
+IndentCaseBlocks: false
+
+ColumnLimit: 120
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: false
+BreakTemplateDeclarations: Yes
+NamespaceIndentation: All
+
+# bracewrapping
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterFunction: true
+  AfterNamespace: false
+  AfterControlStatement: MultiLine
+  AfterEnum: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  SplitEmptyRecord: false
+  BeforeLambdaBody: false
+
+# alignment
+BinPackArguments: false
+# BreakBinaryOperations: OnePerLine
+
+
+# access modifiers
+EmptyLineBeforeAccessModifier: Always
+
+
+...

@@ -1,13 +1,18 @@
 #ifndef TESTHELPER_HPP
 #define TESTHELPER_HPP
 #include <chrono>
-#include <ratio>
+#include <fstream>
 #include <future>
+#include <iostream>
+#include <ratio>
 #include <stdexcept>
 #include <string>
 #include <utility>
-#include <iostream>
-#include <fstream>
+
+#if defined(_WIN32)
+#include "Windows.h"
+#include <stringapiset.h>
+#endif
 
 namespace testhelper {
 	namespace config {
@@ -56,5 +61,5 @@ namespace testhelper {
 		file << "test" << std::endl;
 		file.close();
 	}
-}
+} // namespace testhelper
 #endif
