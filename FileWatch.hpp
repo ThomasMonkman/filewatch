@@ -289,7 +289,7 @@ namespace filewatch {
 		bool pass_filter(const fs::path &file_path)
 		{
 			return (_watching_single_file) ? file_path.filename() == _filename
-						       : std::regex_match(file_path.filename().u8string(), _pattern);
+						       : std::regex_match(file_path.filename().string(), _pattern);
 		}
 
 		void callback_thread()
@@ -404,7 +404,7 @@ namespace filewatch {
 		void notify(const fs::path &path, const FSEventStreamEventFlags flags, ino_t inode)
 		{
 			std::vector<std::pair<fs::path, Event>> callbacks;
-			bool regex_matched = std::regex_match(path.filename().u8string(), this->_pattern);
+			bool regex_matched = pass_filter(path);
 			fs::path parentPath = fs::is_directory(this->_path) ? this->_path : this->_path.parent_path();
 			fs::path relPath = fs::relative(path, parentPath);
 			if (relPath.empty()) {
@@ -446,19 +446,15 @@ namespace filewatch {
 
 		static CFStringRef CFStringRefFromPath(const fs::path &path)
 		{
-			auto u8string = path.u8string(); // native format
-			return CFStringCreateWithBytes(kCFAllocatorDefault,
-			                               (const UInt8 *)u8string.data(),
-			                               u8string.size(),
-			                               kCFStringEncodingUTF8,
-			                               false);
+			auto string = path.string();
+			return CFStringCreateWithCString(kCFAllocatorDefault, path.c_str(), kCFStringEncodingASCII);
 		}
 
 		static fs::path CFStringRefToPath(CFStringRef const &stringRef)
 		{
 			CFIndex length = CFStringGetLength(stringRef);
 			std::vector<char> buffer(length + 1);
-			CFStringGetCString(stringRef, buffer.data(), length + 1, kCFStringEncodingUTF8);
+			CFStringGetCString(stringRef, buffer.data(), length + 1, kCFStringEncodingASCII);
 			return fs::path(buffer.data());
 		}
 
@@ -522,7 +518,7 @@ namespace filewatch {
 			if (fs::is_directory(directory) && !this->_watching_single_file) {
 				for (const auto &dir_entry : fs::directory_iterator{directory}) {
 					const auto &path = dir_entry.path();
-					if (std::regex_match(path.filename().u8string(), this->_pattern)) {
+					if (pass_filter(path)) {
 						_directory_snapshot.insert(path, makeFileState(path));
 					}
 				}
