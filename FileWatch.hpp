@@ -266,6 +266,8 @@ namespace filewatch {
 			{ FILE_ACTION_RENAMED_OLD_NAME, Event::renamed_old },
 			{ FILE_ACTION_RENAMED_NEW_NAME, Event::renamed_new }
 		};
+
+		static constexpr std::size_t _buffer_network_size = { 1024 * 64 };
 #endif // WIN32
 
 #if __unix__
@@ -489,7 +491,7 @@ namespace filewatch {
 
 		void monitor_directory() 
 		{
-			std::vector<BYTE> buffer(_buffer_size);
+			std::vector<BYTE> buffer(PathIsNetworkPath(_directory) ? _buffer_network_size : _buffer_size);
 			DWORD bytes_returned = 0;
 			OVERLAPPED overlapped_buffer{ 0 };
 
